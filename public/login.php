@@ -35,17 +35,8 @@ if (file_exists($header_path)) {
 // Redirect if user is already logged in
 if (isset($_SESSION['user_id'])) {
     $redirect_url_if_already_loggedin = rtrim(SITE_URL, '/') . "/my_account.php";
-    if (isset($_SESSION['role'])) {
-        if ($_SESSION['role'] === 'brand_admin' && defined('BRAND_ADMIN_URL')) { // Assuming BRAND_ADMIN_URL might be defined in config
-            $redirect_url_if_already_loggedin = BRAND_ADMIN_URL;
-        } elseif ($_SESSION['role'] === 'brand_admin') { // Fallback if constant not set
-             $redirect_url_if_already_loggedin = rtrim(SITE_URL, '/') . "/../brand_admin/index.php";
-        } elseif ($_SESSION['role'] === 'super_admin' && defined('SUPER_ADMIN_URL')) { // Assuming SUPER_ADMIN_URL might be defined
-            $redirect_url_if_already_loggedin = SUPER_ADMIN_URL;
-        } elseif ($_SESSION['role'] === 'super_admin') { // Fallback
-            $redirect_url_if_already_loggedin = rtrim(SITE_URL, '/') . "/../admin/index.php";
-        }
-    }
+    // This existing logic for redirecting to admin/brand_admin panels is now modified.
+    // Super/Brand Admins will go to public index by default after login.
     header("Location: " . $redirect_url_if_already_loggedin);
     exit;
 }
@@ -107,16 +98,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
                     $_SESSION['first_name'] = $user['first_name'];
                     $_SESSION['last_name'] = $user['last_name'];
                     $_SESSION['phone_number'] = $user['phone_number'];
-                    
-                    // Determine redirect target based on role
-                    $redirect_target = rtrim(SITE_URL, '/') . "/index.php?login=success"; // Default for customer
 
-                    if ($user['role'] === 'brand_admin') {
-                         $redirect_target = (defined('BRAND_ADMIN_URL') ? BRAND_ADMIN_URL : rtrim(SITE_URL, '/') . "/../brand_admin/index.php") . "?login=success";
-                    } elseif ($user['role'] === 'super_admin') {
-                        $redirect_target = (defined('SUPER_ADMIN_URL') ? SUPER_ADMIN_URL : rtrim(SITE_URL, '/') . "/../admin/index.php") . "?login=success";
-                    }
-                    
+                    // Determine redirect target. All roles go to public index after login.
+                    $redirect_target = rtrim(SITE_URL, '/') . "/index.php?login=success";
+
                     // Handle redirect after login if a destination was stored (e.g., from checkout)
                     if(isset($_SESSION['redirect_after_login'])) {
                         $redirect_target = $_SESSION['redirect_after_login'];
@@ -149,9 +134,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
             Registration successful! You can now login.
         </div>
     <?php endif; ?>
-    <?php if (isset($_GET['logout']) && $_GET['logout'] === 'success'): // Renamed from 'logged_out' for consistency with index.php
-        // Message is displayed on index.php via JS after redirect, so not strictly needed here
-        // but kept for direct navigation to login.php?logout=success
+    <?php if (isset($_GET['logout']) && $_GET['logout'] === 'success'):
         echo "<div class='form-message success-message'>You have been successfully logged out.</div>";
     endif; ?>
      <?php if (isset($_GET['verified']) && $_GET['verified'] === 'success'): ?>
@@ -201,7 +184,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
         <div class="form-group">
             <button type="submit" name="login" class="btn btn-primary btn-block btn-lg">Login</button>
         </div>
-        
+
         <p class="form-switch-link"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/forgot_password.php">Forgot your password?</a></p>
         <p class="form-switch-link">Don't have an account? <a href="<?php echo rtrim(SITE_URL, '/'); ?>/register.php">Register here</a>.</p>
     </form>

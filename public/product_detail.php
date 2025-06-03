@@ -3,7 +3,6 @@
 
 $page_error_message = '';
 $product = null;
-// $brand variable is not explicitly used later, product array contains brand_name and brand_id
 $additional_images = [];
 
 // Configuration, Header, and Footer
@@ -28,7 +27,6 @@ $footer_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes
 // Get Product ID from URL
 if (!isset($_GET['id']) || !filter_var($_GET['id'], FILTER_VALIDATE_INT) || (int)$_GET['id'] <= 0) {
     $page_error_message = "Invalid product ID specified.";
-    // To prevent further execution and potential errors, we can set product to false or handle it before DB connection
     $product_id = 0; // Invalid ID
 } else {
     $product_id = (int)$_GET['id'];
@@ -88,7 +86,6 @@ if (empty($page_error_message) && $product_id > 0 && isset($db) && $db instanceo
 } elseif ($product_id === 0 && empty($page_error_message)) { // If ID was invalid from the start
      $page_error_message = "Invalid product ID specified.";
 }
-
 
 // Include Header (after $page_title is potentially set)
 if (file_exists($header_path)) {
@@ -174,7 +171,7 @@ if (file_exists($header_path)) {
                                      alt="<?php echo $thumb_alt; ?>"
                                      class="thumbnail-image <?php echo ($thumb_src === $main_image_src) ? 'active' : ''; ?>"
                                      data-large-src="<?php echo $thumb_src; ?>"
-                                     onerror="this.style.display='none';">
+                                     onerror="this.onerror=null;this.src='<?php echo $fallback_image_src; ?>';">
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
@@ -244,23 +241,6 @@ if (file_exists($header_path)) {
                         <?php if(isset($product['sku']) && !empty($product['sku'])): ?>
                             <p><small>SKU: <?php echo esc_html($product['sku']); ?></small></p>
                         <?php endif; ?>
-                        <?php
-                        // TODO: Display categories if fetched
-                        // Example: Fetch and display categories
-                        // $stmt_cats = $db->prepare("SELECT c.category_id, c.category_name FROM categories c JOIN product_category pc ON c.category_id = pc.category_id WHERE pc.product_id = :product_id");
-                        // $stmt_cats->bindParam(':product_id', $product_id, PDO::PARAM_INT);
-                        // $stmt_cats->execute();
-                        // $product_categories = $stmt_cats->fetchAll(PDO::FETCH_ASSOC);
-                        // if($product_categories) {
-                        //    echo "<p><small>Categories: ";
-                        //    $cat_links = [];
-                        //    foreach($product_categories as $cat) {
-                        //        $cat_links[] = "<a href='" . rtrim(SITE_URL, '/') . "/products.php?category_id=" . esc_html($cat['category_id']) . "'>" . esc_html($cat['category_name']) . "</a>";
-                        //    }
-                        //    echo implode(', ', $cat_links);
-                        //    echo "</small></p>";
-                        // }
-                        ?>
                     </div>
                 </div>
             </div>

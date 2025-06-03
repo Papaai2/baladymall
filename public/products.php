@@ -1,24 +1,23 @@
 <?php
 // public/products.php
 
-$page_title = "All Products - BaladyMall";
-
-// Configuration, Header, and Footer
+// Ensure config.php is loaded first for all constants and session_start()
 $config_path_from_public = __DIR__ . '/../src/config/config.php';
-$header_path_from_public = __DIR__ . '/../src/includes/header.php';
-$footer_path_from_public = __DIR__ . '/../src/includes/footer.php';
-
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
     die("Critical error: Main configuration file not found. Expected at: " . $config_path_from_public);
 }
 
+// Include header (which will also rely on config.php)
+$header_path_from_public = PROJECT_ROOT_PATH . '/src/includes/header.php';
 if (file_exists($header_path_from_public)) {
     require_once $header_path_from_public; // Starts session
 } else {
     die("Critical error: Header file not found. Expected at: " . htmlspecialchars($header_path_from_public));
 }
+
+$page_title = "All Products - BaladyMall";
 
 $db = getPDOConnection();
 $all_products = [];
@@ -213,6 +212,7 @@ try {
 </section>
 
 <?php
+$footer_path_from_public = PROJECT_ROOT_PATH . '/src/includes/footer.php';
 if (file_exists($footer_path_from_public)) {
     require_once $footer_path_from_public;
 } else {

@@ -206,8 +206,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
         if (empty($shipping_phone_post)) $errors['shipping_phone'] = "Shipping phone number is required.";
         elseif (!preg_match('/^\+?[0-9\s\-()]{7,20}$/', $shipping_phone_post)) $errors['shipping_phone'] = "Invalid shipping phone number format.";
         if (empty($shipping_address1_post)) $errors['shipping_address_line1'] = "Shipping Address Line 1 is required.";
-        if (empty($shipping_city_post)) $errors['shipping_city'] = "City is required.";
-        if (empty($shipping_governorate_post)) $errors['shipping_governorate'] = "Governorate is required.";
+        if (empty($shipping_city_post)) $errors['shipping_city'] = "Shipping city is required.";
+        if (empty($shipping_governorate_post)) $errors['shipping_governorate'] = "Shipping governorate is required.";
         if (empty($payment_method_post)) $errors['payment_method'] = "Please select a payment method.";
         elseif (!in_array($payment_method_post, ['cod'])) $errors['payment_method'] = "Invalid payment method selected."; // Allow only 'cod' for now
 
@@ -476,7 +476,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                         <hr>
                         <p><strong>Subtotal:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($cart_subtotal_checkout, 2)); ?></span></p>
                         <p>Shipping: <span class="text-muted"><?php echo ($shipping_amount_checkout > 0) ? CURRENCY_SYMBOL . esc_html(number_format($shipping_amount_checkout, 2)) : 'Free'; ?></span></p>
-                        <p>Taxes: <span class="text-muted"><?php echo ($tax_amount_checkout > 0) ? CURRENCY_SYMBOL . esc_html(number_format($tax_amount_checkout, 2)); ?></span></p>
+                        <p>Taxes: <span class="text-muted"><?php echo ($tax_amount_checkout > 0) ? CURRENCY_SYMBOL . esc_html(number_format($tax_amount_checkout, 2)) : '0.00'; ?></span></p>
                         <?php if ($discount_amount_checkout > 0): ?>
                         <p><strong>Discount:</strong> <span style="color: green;">-<?php echo CURRENCY_SYMBOL . esc_html(number_format($discount_amount_checkout, 2)); ?></span></p>
                         <?php endif; ?>
@@ -502,3 +502,4 @@ if (file_exists($footer_path)) {
     die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path));
 }
 ?>
+

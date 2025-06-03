@@ -1,33 +1,23 @@
 <?php
 // public/brands.php
 
-$page_title = "Our Brands - BaladyMall";
-
-// Configuration, Header, and Footer paths
-$config_path_from_public = __DIR__ . '/../src/config/config.php'; // Path to config from current file
-
-// Ensure config.php is loaded first
+// Ensure config.php is loaded first for all constants and session_start()
+$config_path_from_public = __DIR__ . '/../src/config/config.php';
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
-    $alt_config_path = dirname(__DIR__) . '/src/config/config.php';
-    if (file_exists($alt_config_path)) {
-        require_once $alt_config_path;
-    } else {
-        die("Critical error: Main configuration file not found. Please check paths.");
-    }
+    die("Critical error: Main configuration file not found. Expected at: " . $config_path_from_public);
 }
 
-// Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
-$header_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/header.php' : __DIR__ . '/../src/includes/header.php';
-$footer_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/footer.php' : __DIR__ . '/../src/includes/footer.php';
-
-// Header includes session_start()
+// Include header (which will also rely on config.php)
+$header_path = PROJECT_ROOT_PATH . '/src/includes/header.php';
 if (file_exists($header_path)) {
     require_once $header_path;
 } else {
     die("Critical error: Header file not found. Expected at: " . htmlspecialchars($header_path));
 }
+
+$page_title = "Our Brands - BaladyMall";
 
 // Ensure $db is available
 $db_available = false;
@@ -126,9 +116,10 @@ if ($db_available) {
 </section>
 
 <?php
-if (file_exists($footer_path)) {
-    require_once $footer_path;
+$footer_path_from_public = PROJECT_ROOT_PATH . '/src/includes/footer.php';
+if (file_exists($footer_path_from_public)) {
+    require_once $footer_path_from_public;
 } else {
-    die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path));
+    die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path_from_public));
 }
 ?>

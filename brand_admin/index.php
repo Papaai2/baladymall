@@ -130,7 +130,10 @@ try {
 
 ?>
 
-<h1 class="brand-admin-page-title"><?php echo htmlspecialchars($brand_admin_page_title); ?> for <?php echo htmlspecialchars($current_brand_name); ?></h1>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1 class="brand-admin-page-title" style="margin-bottom: 0;"><?php echo htmlspecialchars($brand_admin_page_title); ?> for <?php echo htmlspecialchars($current_brand_name); ?></h1>
+    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/index.php" class="btn-submit" style="padding: 8px 15px; text-decoration:none; background-color: #6c757d; border-color: #6c757d;">Back to Site</a>
+</div>
 
 <div class="stat-cards-container">
     <div class="stat-card total-sales">
@@ -221,7 +224,16 @@ try {
                         <tr>
                             <td>
                                 <?php
-                                $image_path = $product['main_image_url'] ? htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $product['main_image_url']) : htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '30x30/eee/aaa?text=Img');
+                                $image_path = '';
+                                if (!empty($product['main_image_url'])) {
+                                    if (filter_var($product['main_image_url'], FILTER_VALIDATE_URL)) {
+                                        $image_path = htmlspecialchars($product['main_image_url']);
+                                    } else {
+                                        $image_path = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $product['main_image_url']);
+                                    }
+                                } else {
+                                    $image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '30x30/eee/aaa?text=Img');
+                                }
                                 $fallback_image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '30x30/eee/aaa?text=Error');
                                 ?>
                                 <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($product['product_name']); ?>" style="width: 30px; height: 30px; object-fit: cover; border-radius: 3px; vertical-align: middle; margin-right: 5px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">

@@ -1,37 +1,23 @@
 <?php
 // public/index.php
 
-$page_title = "Welcome to BaladyMall - Your Home for Local Egyptian Brands";
-
-// Define paths relative to the current file (public/index.php)
+// Ensure config.php is loaded first for all constants and session_start()
 $config_path_from_public = __DIR__ . '/../src/config/config.php';
-$header_path_from_public = __DIR__ . '/../src/includes/header.php';
-$footer_path_from_public = __DIR__ . '/../src/includes/footer.php';
-
-// Ensure config.php is loaded first
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
-    $alt_config_path = dirname(__DIR__) . '/src/config/config.php';
-    if (file_exists($alt_config_path)) {
-        require_once $alt_config_path;
-    } else {
-        die("Critical error: Main configuration file not found. Please check paths.");
-    }
+    die("CRITICAL ERROR: Main config.php not found. Expected at: " . htmlspecialchars($config_path_from_public));
 }
 
-// Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
-if (defined('PROJECT_ROOT_PATH')) {
-    $header_path_from_public = PROJECT_ROOT_PATH . '/src/includes/header.php';
-    $footer_path_from_public = PROJECT_ROOT_PATH . '/src/includes/footer.php';
-}
-
-
+// Include header (which will also rely on config.php)
+$header_path_from_public = PROJECT_ROOT_PATH . '/src/includes/header.php';
 if (file_exists($header_path_from_public)) {
     require_once $header_path_from_public;
 } else {
-    die("Critical error: Header file not found. Expected at: " . htmlspecialchars($header_path_from_public));
+    die("CRITICAL ERROR: Header file not found. Expected at: " . htmlspecialchars($header_path_from_public));
 }
+
+$page_title = "Welcome to BaladyMall - Your Home for Local Egyptian Brands";
 
 // $db should be initialized in config.php
 if (!isset($db) || !$db instanceof PDO) {
@@ -128,7 +114,7 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
         $category_grid_class = ($featured_categories_count === 1) ? 'category-grid single-item-grid' : 'category-grid';
         echo "<div class=\"" . $category_grid_class . "\">";
         if (empty($categories_html) && $featured_categories_count === 0 && !(isset($e))) {
-             echo "<p class='col-span-full text-center text-gray-500' style='grid-column: 1 / -1;'>No featured categories to display at the moment.</p>";
+             echo "<p class='col-span-full text-center text-gray-500' style='grid-column: 1 / -1;'>No featured categories to display at the moment. Check back soon!</p>";
         } else {
             echo $categories_html;
         }
@@ -216,9 +202,10 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
 </section>
 
 <?php
+$footer_path_from_public = PROJECT_ROOT_PATH . '/src/includes/footer.php';
 if (file_exists($footer_path_from_public)) {
     require_once $footer_path_from_public;
 } else {
-    die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path_from_public));
+    die("CRITICAL ERROR: Footer file not found. Expected at: " . htmlspecialchars($footer_path_from_public));
 }
 ?>

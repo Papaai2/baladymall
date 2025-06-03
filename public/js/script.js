@@ -192,7 +192,6 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault(); // Prevent default form submission (redirection)
 
             const formData = new FormData(this); // Get form data
-            // *** CRUCIAL CHANGE HERE: Use getAttribute('action') for absolute certainty ***
             const formAction = this.getAttribute('action'); // Correctly get the string value of the action attribute
 
             // Disable button to prevent multiple clicks

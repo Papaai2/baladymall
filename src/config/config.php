@@ -2,66 +2,98 @@
 // src/config/config.php
 
 // --- Error Reporting (Development vs Production) ---
-ini_set('display_errors', 0); // Set to 0 in production
-ini_set('display_startup_errors', 0); // Set to 0 in production
-error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT); // Log errors, don't display
+ini_set('display_errors', 1); // Set to 0 in production for live site
+ini_set('display_startup_errors', 1); // Set to 0 in production for live site
+error_reporting(E_ALL); // Report all PHP errors
 
 // --- Session Management ---
+// Ensure session is started only once per request.
+// This block should be at the very top of any file that uses sessions.
 if (session_status() == PHP_SESSION_NONE) {
-    if (defined('SESSION_NAME') && !headers_sent()) {
-        session_name(SESSION_NAME);
+    // Define SESSION_NAME if not already set (it should ideally be loaded from site_settings later)
+    if (!defined('SESSION_NAME')) {
+        define('SESSION_NAME', 'BaladyMallSession'); // Default fallback name
     }
-    if(!headers_sent()) {
-        error_log("CONFIG.PHP: Session could not be started because headers were already sent.");
-        // In production, you might redirect to an error page or exit gracefully
-        // die("Critical error: Session could not be started.");
-    } else {
-        session_start();
+    session_name(SESSION_NAME);
+
+    // Set secure session cookie parameters for production.
+    // IMPORTANT: Uncomment and configure these for your live domain!
+    /*
+    session_set_cookie_params([
+        'lifetime' => 0, // Session cookie expires when the browser closes
+        'path' => '/', // Cookie is available across the entire domain
+        'domain' => '', // IMPORTANT: Set your actual domain for production, e.g., '.yourdomain.com'
+        'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off', // Only send over HTTPS
+        'httponly' => true, // Prevent JavaScript access to the cookie
+        'samesite' => 'Lax' // Or 'Strict' for more security
+    ]);
+    */
+
+    $session_start_result = session_start();
+    if (!$session_start_result) {
+        // Log a critical error if session_start fails (e.g., permissions on session save path)
+        error_log("CRITICAL ERROR: session_start() failed in config.php. Check session save path permissions.");
+        // In a production environment, you might want to redirect to a generic error page or exit here.
+        // For development, we'll log and attempt to continue, but expect session-related issues.
     }
 }
+
 
 // --- Site URL and Paths ---
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-if (!defined('PROJECT_ROOT_PATH')) define('PROJECT_ROOT_PATH', dirname(dirname(__DIR__)));
+// **CRITICAL FIX: Robust PROJECT_ROOT_PATH definition**
+// This reliably points to the 'baladymall' root directory.
+// __FILE__ is the full path to the current file (config.php).
+// dirname(__FILE__) is 'baladymall/src/config'
+// dirname(dirname(__FILE__)) is 'baladymall/src'
+// dirname(dirname(dirname(__FILE__))) is 'baladymall' (the project root)
+if (!defined('PROJECT_ROOT_PATH')) {
+    define('PROJECT_ROOT_PATH', dirname(dirname(dirname(__FILE__))));
+}
 
+// Define SITE_URL to point to the public folder, accessible via the web
 if (!defined('SITE_URL')) {
-    $document_root = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']);
+    $document_root = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']); // Normalize slashes
     $project_root_normalized = str_replace('\\', '/', PROJECT_ROOT_PATH);
 
     $project_web_path_segment = '';
+    // Check if project root is directly under document root
     if (strpos($project_root_normalized, $document_root) === 0) {
         $project_web_path_segment = substr($project_root_normalized, strlen($document_root));
-        if (!empty($project_web_path_segment) && $project_web_path_segment[0] !== '/') {
-            $project_web_path_segment = '/' . $project_web_path_segment;
-        }
     } else {
+        // Fallback: Attempt to guess the project's web path segment from SCRIPT_NAME
+        // This is for setups where the project folder is not directly under DOCUMENT_ROOT
+        // e.g., if DOCUMENT_ROOT is /var/www/html and project is /var/www/html/myproject
+        // or if DOCUMENT_ROOT is /var/www/html/myproject/public
         $script_name_parts = explode('/', trim($_SERVER['SCRIPT_NAME'] ?? '', '/'));
         $found_project_segment = '';
         foreach ($script_name_parts as $segment) {
-            if ($segment !== 'public' && $segment !== 'admin' && $segment !== 'brand_admin' && !empty($segment)) {
+            // Find the first segment that is not 'public', 'admin', or 'brand_admin'
+            if (!in_array($segment, ['public', 'admin', 'brand_admin']) && !empty($segment)) {
                 $found_project_segment = '/' . $segment;
                 break;
             }
         }
         $project_web_path_segment = $found_project_segment;
     }
-    define('SITE_URL', $protocol . $host . rtrim($project_web_path_segment, '/') . '/public');
+    // Ensure leading slash and no trailing slash for the segment
+    $project_web_path_segment = '/' . trim($project_web_path_segment, '/');
+    if ($project_web_path_segment === '/') $project_web_path_segment = ''; // If it resolves to just '/', make it empty
+
+    define('SITE_URL', $protocol . $host . $project_web_path_segment . '/public');
 }
 
+
+// Define public root path (filesystem path to the public folder)
 if (!defined('PUBLIC_ROOT_PATH')) define('PUBLIC_ROOT_PATH', PROJECT_ROOT_PATH . '/public');
-if (!defined('PUBLIC_UPLOADS_PATH')) define('PUBLIC_UPLOADS_PATH', PUBLIC_ROOT_PATH . '/uploads/');
 
-if (!defined('PUBLIC_UPLOADS_URL_BASE')) {
-    if (!defined('SITE_URL')) {
-        $protocol_fallback = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
-        $host_fallback = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        define('PUBLIC_UPLOADS_URL_BASE', $protocol_fallback . $host_fallback . '/public/uploads/');
-    } else {
-        define('PUBLIC_UPLOADS_URL_BASE', rtrim(SITE_URL, '/') . '/uploads/');
-    }
-}
+// Define path to the public uploads directory (filesystem path)
+if (!defined('PUBLIC_UPLOADS_PATH')) define('PUBLIC_UPLOADS_PATH', PUBLIC_ROOT_PATH . '/uploads/');
+// Define the web-accessible base URL for uploads
+if (!defined('PUBLIC_UPLOADS_URL_BASE')) define('PUBLIC_UPLOADS_URL_BASE', rtrim(SITE_URL, '/') . '/uploads/');
+
 
 // --- Database Credentials ---
 if (!defined('DB_HOST')) define('DB_HOST', 'localhost');
@@ -90,9 +122,10 @@ if (!function_exists('getPDOConnection')) {
         return $pdo_instance;
     }
 }
-$db = null;
+$db = null; // Initialize to null; individual scripts call getPDOConnection() as needed.
 
-// --- Function to get a single setting (can be moved to a helper file later) ---
+
+// --- Function to get a single setting from site_settings table ---
 if (!function_exists('get_site_setting')) {
     function get_site_setting($db_conn_param, $key, $default_value = null) {
         if (!$db_conn_param instanceof PDO) {
@@ -112,15 +145,17 @@ if (!function_exists('get_site_setting')) {
     }
 }
 
-// --- Load Core Site Settings from Database into Constants (or a global settings array) ---
+// --- Load Core Site Settings from Database into Constants ---
+// This block attempts to get a DB connection to load settings.
 $_settings_db_conn = null;
 try {
-    $_settings_db_conn = getPDOConnection();
+    $_settings_db_conn = getPDOConnection(); // Get a connection for settings
 } catch (Exception $e) {
     error_log("CONFIG.PHP: Initial DB connection for settings failed: " . $e->getMessage());
 }
 
 if ($_settings_db_conn instanceof PDO) {
+    // Define constants using values from the database or defaults
     if (!defined('SITE_NAME')) define('SITE_NAME', get_site_setting($_settings_db_conn, 'site_name', 'BaladyMall'));
     if (!defined('ADMIN_EMAIL')) define('ADMIN_EMAIL', get_site_setting($_settings_db_conn, 'admin_email', 'admin@example.com'));
     if (!defined('PUBLIC_CONTACT_EMAIL')) define('PUBLIC_CONTACT_EMAIL', get_site_setting($_settings_db_conn, 'public_contact_email', 'support@example.com'));
@@ -134,9 +169,7 @@ if ($_settings_db_conn instanceof PDO) {
     if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', get_site_setting($_settings_db_conn, 'site_logo_url', ''));
     if (!defined('FAVICON_PATH')) define('FAVICON_PATH', get_site_setting($_settings_db_conn, 'favicon_url', ''));
 
-    // --- NEW: SMTP Configuration from DB Settings (or hardcoded if not in DB) ---
-    // You would add these settings to your `site_settings` table via admin panel
-    // or hardcode them here if you don't want them managed in the DB.
+    // SMTP Configuration (from DB settings or hardcoded defaults)
     if (!defined('SMTP_HOST')) define('SMTP_HOST', get_site_setting($_settings_db_conn, 'smtp_host', 'smtp.example.com'));
     if (!defined('SMTP_PORT')) define('SMTP_PORT', (int)get_site_setting($_settings_db_conn, 'smtp_port', 587));
     if (!defined('SMTP_USERNAME')) define('SMTP_USERNAME', get_site_setting($_settings_db_conn, 'smtp_username', 'your_email@example.com'));
@@ -146,12 +179,12 @@ if ($_settings_db_conn instanceof PDO) {
     if (!defined('MAIL_FROM_NAME')) define('MAIL_FROM_NAME', get_site_setting($_settings_db_conn, 'mail_from_name', SITE_NAME));
 
 } else {
+    // Fallback constants if DB connection for settings failed
     if (!defined('SITE_NAME')) define('SITE_NAME', 'BaladyMall (DB Error)');
     if (!defined('CURRENCY_SYMBOL')) define('CURRENCY_SYMBOL', 'EGP ');
-    error_log("CONFIG.PHP: Database connection not available when trying to load site settings.");
+    error_log("CONFIG.PHP: Database connection not available when trying to load site settings, using hardcoded fallbacks.");
 
-    // Fallback for SMTP constants if DB connection failed
-    if (!defined('SMTP_HOST')) define('SMTP_HOST', 'localhost'); // Default to localhost for mail() fallback
+    if (!defined('SMTP_HOST')) define('SMTP_HOST', 'localhost');
     if (!defined('SMTP_PORT')) define('SMTP_PORT', 25);
     if (!defined('SMTP_USERNAME')) define('SMTP_USERNAME', '');
     if (!defined('SMTP_PASSWORD')) define('SMTP_PASSWORD', '');
@@ -160,29 +193,28 @@ if ($_settings_db_conn instanceof PDO) {
     if (!defined('MAIL_FROM_NAME')) define('MAIL_FROM_NAME', 'BaladyMall');
 }
 
-// --- Email Sending Function (Using PHPMailer or native mail()) ---
+// --- Email Sending Function (Simulated for local, PHPMailer for production) ---
 if (!function_exists('send_email')) {
     function send_email($to_email, $subject, $body, $alt_body = '', $is_html = false) {
-        // For local development, just log the email.
-        // For production, integrate PHPMailer or another library/service.
+        // For local development, just log the email content to the PHP error log.
         error_log("--- EMAIL SENT (Simulated) ---\nTo: {$to_email}\nSubject: {$subject}\nBody:\n{$body}\n--- END EMAIL ---\n");
         return true; // Always return true for simulation
 
         /*
-        // --- PRODUCTION READY PHPMailer INTEGRATION EXAMPLE ---
+        // --- PRODUCTION READY PHPMailer INTEGRATION EXAMPLE (Uncomment for live) ---
         // You would need to ensure PHPMailer is installed (e.g., via Composer)
-        // and its autoloader is included.
+        // and its autoloader is included in your main application bootstrap.
         // require_once PROJECT_ROOT_PATH . '/vendor/autoload.php'; // If using Composer
-        // OR
+        // OR manually include:
         // require_once PROJECT_ROOT_PATH . '/src/lib/PHPMailer/src/PHPMailer.php';
         // require_once PROJECT_ROOT_PATH . '/src/lib/PHPMailer/src/SMTP.php';
         // require_once PROJECT_ROOT_PATH . '/src/lib/PHPMailer/src/Exception.php';
 
         // use PHPMailer\PHPMailer\PHPMailer;
         // use PHPMailer\PHPMailer\Exception;
-        // use PHPMailer\PHPMailer\SMTP;
+        // use PHPMailer\PHPMailer\SMTP; // Needed for SMTP::DEBUG_SERVER etc.
 
-        // $mail = new PHPMailer(true); // Enable exceptions
+        // $mail = new PHPMailer(true); // Enable exceptions for error handling
 
         // try {
         //     // Server settings
@@ -191,22 +223,31 @@ if (!function_exists('send_email')) {
         //     $mail->SMTPAuth   = true;
         //     $mail->Username   = SMTP_USERNAME;
         //     $mail->Password   = SMTP_PASSWORD;
-        //     $mail->SMTPSecure = SMTP_ENCRYPTION; // PHPMailer::ENCRYPTION_SMTPS or PHPMailer::ENCRYPTION_STARTTLS
+        //     // Use PHPMailer's constants for encryption
+        //     if (SMTP_ENCRYPTION === 'ssl') {
+        //         $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        //     } elseif (SMTP_ENCRYPTION === 'tls') {
+        //         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        //     } else {
+        //         $mail->SMTPSecure = false; // No encryption
+        //     }
         //     $mail->Port       = SMTP_PORT;
         //     $mail->CharSet    = 'UTF-8';
+        //     // $mail->SMTPDebug = SMTP::DEBUG_SERVER; // Uncomment for verbose SMTP debugging
 
         //     // Recipients
         //     $mail->setFrom(MAIL_FROM_ADDRESS, MAIL_FROM_NAME);
         //     $mail->addAddress($to_email);
 
         //     // Content
-        //     $mail->isHTML($is_html);
+        //     $mail->isHTML($is_html); // Set email format to HTML
         //     $mail->Subject = $subject;
         //     $mail->Body    = $body;
         //     if ($alt_body) {
         //         $mail->AltBody = $alt_body;
         //     } else {
-        //         $mail->AltBody = strip_tags($body); // Generate plain text from HTML if alt_body not provided
+        //         // Generate plain text from HTML if alt_body is not provided
+        //         $mail->AltBody = strip_tags($body);
         //     }
 
         //     $mail->send();
@@ -221,6 +262,7 @@ if (!function_exists('send_email')) {
 
 
 // --- Maintenance Mode Check ---
+// This check relies on site settings from the database.
 if ($_settings_db_conn instanceof PDO) {
     $maintenance_mode_enabled = get_site_setting($_settings_db_conn, 'maintenance_mode', '0');
     $is_admin_logged_in = (isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'super_admin');
@@ -231,9 +273,11 @@ if ($_settings_db_conn instanceof PDO) {
     $is_brand_admin_area_script = (strpos($_SERVER['PHP_SELF'], '/brand_admin/') !== false);
     $is_maintenance_script = (basename($_SERVER['PHP_SELF']) === 'maintenance.php');
 
+    // If maintenance mode is enabled and user is not an admin or on the maintenance page itself, redirect.
     if ($maintenance_mode_enabled === '1' && !$is_admin_logged_in && !$is_brand_admin_logged_in && !$is_admin_area_script && !$is_brand_admin_area_script && !$is_maintenance_script) {
         $maintenance_page_url = rtrim(SITE_URL, '/') . '/maintenance.php';
 
+        // Prevent infinite redirects if already on the maintenance page
         if (strpos($_SERVER['REQUEST_URI'], 'maintenance.php') === false) {
             header('HTTP/1.1 503 Service Temporarily Unavailable');
             header('Status: 503 Service Temporarily Unavailable');
@@ -249,6 +293,7 @@ if (!defined('MAX_IMAGE_SIZE')) define('MAX_IMAGE_SIZE', 5 * 1024 * 1024); // 5M
 if (!defined('PLACEHOLDER_IMAGE_URL_GENERATOR')) define('PLACEHOLDER_IMAGE_URL_GENERATOR', 'https://placehold.co/');
 
 // --- Helper Functions ---
+// Ensure this function is available globally for HTML escaping.
 if (!function_exists('esc_html')) {
     function esc_html($string) {
         return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');

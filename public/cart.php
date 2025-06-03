@@ -1,8 +1,27 @@
 <?php
 // public/cart.php
 
-// Start output buffering immediately
+// Start output buffering immediately. This MUST be the very first line.
 ob_start();
+
+// --- CRITICAL FIX: Load config.php directly and unconditionally at the very beginning ---
+// This ensures all constants (like SESSION_NAME, SITE_URL, PROJECT_ROOT_PATH)
+// and functions (like getPDOConnection, send_email) are available immediately and correctly.
+$config_path_from_public = __DIR__ . '/../src/config/config.php';
+if (file_exists($config_path_from_public)) {
+    require_once $config_path_from_public;
+} else {
+    // If config.php is not found, we cannot proceed. This is a fatal error.
+    die("Critical error: Main configuration file not found. Expected at: " . htmlspecialchars($config_path_from_public));
+}
+
+// --- Debugging Log Points (Keep these for testing, remove in production) ---
+// These logs will now reflect the session status *after* config.php has run session_start()
+error_log("cart.php: Script start. Session status: " . session_status() . " (1=none, 2=active)");
+error_log("cart.php: User ID in session: " . ($_SESSION['user_id'] ?? 'NOT SET'));
+error_log("cart.php: User Role in session: " . ($_SESSION['role'] ?? 'NOT SET'));
+// --- END Debugging Log Points ---
+
 
 // Define a flag to check if the request is AJAX
 $is_ajax_request = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
@@ -10,37 +29,21 @@ $is_ajax_action = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action
 
 
 if ($is_ajax_request || $is_ajax_action) {
-    // This is an AJAX request, we will output JSON
     header('Content-Type: application/json');
-    // Initialize 'type' key with a default 'error' to prevent 'Undefined array key' warning
     $response = ['success' => false, 'message' => 'An unexpected error occurred.', 'cart_item_count' => 0, 'type' => 'error'];
 }
 
 $page_title = "Your Shopping Cart - BaladyMall";
 
-// --- IMPORTANT FIX: Define header/footer paths unconditionally at the top ---
-$config_path_from_public = __DIR__ . '/../src/config/config.php';
+// Define header and footer paths using PROJECT_ROOT_PATH for robustness.
+// PROJECT_ROOT_PATH is now correctly defined from config.php
 $header_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/header.php' : __DIR__ . '/../src/includes/header.php';
 $footer_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/footer.php' : __DIR__ . '/../src/includes/footer.php';
 
 
-if (file_exists($config_path_from_public)) {
-    require_once $config_path_from_public;
-} else {
-    if ($is_ajax_request || $is_ajax_action) {
-        // Clear any buffered output before sending JSON error
-        ob_clean(); // Important: Clear buffer
-        $response['message'] = "Server configuration error: Config file not found.";
-        $response['type'] = 'error';
-        echo json_encode($response);
-        exit;
-    }
-    die("Critical error: Main configuration file not found. Please check paths.");
-}
-
 // Only include header/footer HTML if NOT an AJAX request
+// Session should already be started by config.php at this point.
 if (!($is_ajax_request || $is_ajax_action)) {
-    // End buffering for HTML output
     ob_end_flush(); // Send buffered output for HTML requests
     if (file_exists($header_path)) {
         require_once $header_path;
@@ -48,9 +51,7 @@ if (!($is_ajax_request || $is_ajax_action)) {
         die("Critical error: Header file not found. Expected at: " . htmlspecialchars($header_path));
     }
 } else {
-    // For AJAX requests, clear any output that might have been accidentally buffered so far.
-    // This is a safety net against stray spaces/newlines from included files.
-    ob_clean();
+    ob_clean(); // For AJAX requests, clear any output that might have been accidentally buffered so far.
 }
 
 
@@ -63,7 +64,7 @@ if (function_exists('getPDOConnection')) {
 if (!isset($db) || !$db instanceof PDO) {
     $error_message_for_db = "<div class='form-message error-message'>Database connection is not available. Cart operations may fail.</div>";
     if ($is_ajax_request || $is_ajax_action) {
-        ob_clean(); // Clear buffer again before JSON output
+        ob_clean(); // Clear buffer before JSON output
         $response['message'] = "Database connection error. Cannot perform cart operations.";
         $response['type'] = 'error';
         echo json_encode($response);
@@ -78,7 +79,7 @@ $cart_subtotal = 0;
 $cart_total_items = 0;
 $cart_action_message = $cart_action_message ?? '';
 
-// Initialize cart in session if it doesn't exist
+// Initialize cart in session if it doesn't exist. This is now safe.
 if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
 }
@@ -96,7 +97,34 @@ if (isset($db) && $db instanceof PDO) {
 
     $quantity_request = $_REQUEST['quantity'] ?? 1;
 
-    if ($action && $product_id_req !== null && $product_id_req > 0 && $action !== 'update_all') {
+    // --- Redirect guest users to login for 'add' action ---
+    // This check will now reliably use the session data.
+    if ($action === 'add' && !isset($_SESSION['user_id'])) {
+        error_log("cart.php: Redirecting unauthenticated user for 'add' action.");
+        $redirect_url = rtrim(SITE_URL, '/') . "/login.php?auth=required&target=cart&message=login_to_add_to_cart";
+
+        if ($is_ajax_request || $is_ajax_action) {
+            ob_clean();
+            $response['success'] = false;
+            $response['message'] = "Please log in to add items to your cart.";
+            $response['type'] = 'info';
+            $response['redirect'] = $redirect_url; // Signal client-side to redirect
+            echo json_encode($response);
+            exit;
+        } else {
+            $_SESSION['redirect_after_login'] = rtrim(SITE_URL, '/') . "/products.php"; // Redirect back to products page after login
+            $_SESSION['cart_message'] = "<div class='form-message info-message'>Please log in to add items to your cart.</div>";
+            header("Location: " . $redirect_url);
+            exit;
+        }
+    }
+    // --- END REDIRECT LOGIC ---
+
+
+    // This block now only proceeds if an action is set, product ID is valid, AND user is logged in
+    if ($action && $product_id_req !== null && $product_id_req > 0 && isset($_SESSION['user_id']) && $action !== 'update_all') {
+        error_log("cart.php: Processing action '{$action}' for logged-in user: " . $_SESSION['user_id']);
+
         $stock_quantity_db = 9999;
         $is_simple_product_with_stock_db = false;
         $product_name_for_message_db = "Product (ID: {$product_id_req})";
@@ -119,25 +147,25 @@ if (isset($db) && $db instanceof PDO) {
             } else {
                  $msg_text = "Product (ID: {$product_id_req}) not found.";
                  if ($is_ajax_request || $is_ajax_action) {
-                     ob_clean(); // Clear buffer before JSON error
+                     ob_clean();
                      $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
                      echo json_encode($response); exit;
                  } else {
                      $cart_action_message .= "<div class='form-message error-message'>{$msg_text}</div>";
                  }
-                 $action = null;
+                 $action = null; // Prevent further processing
             }
         } catch (PDOException $e) {
             error_log("Cart Action - Stock Check Error (Product ID: {$product_id_req}): " . $e->getMessage());
             $msg_text = "Could not verify product stock. Please try again.";
             if ($is_ajax_request || $is_ajax_action) {
-                ob_clean(); // Clear buffer before JSON error
+                ob_clean();
                 $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
                 echo json_encode($response); exit;
             } else {
                 $cart_action_message .= "<div class='form-message error-message'>{$msg_text}</div>";
             }
-            $action = null;
+            $action = null; // Prevent further processing
         }
 
         if ($action && $product_is_active_db) {
@@ -184,7 +212,7 @@ if (isset($db) && $db instanceof PDO) {
                     }
 
                     if ($is_ajax_request || $is_ajax_action) {
-                        ob_clean(); // Ensure output buffer is clean before final JSON
+                        ob_clean();
                         $_SESSION['header_cart_item_count'] = array_sum($_SESSION['cart']);
                         $response['cart_item_count'] = $_SESSION['header_cart_item_count'];
                         echo json_encode($response);
@@ -215,7 +243,7 @@ if (isset($db) && $db instanceof PDO) {
                         $response['type'] = 'success'; $response['success'] = true;
                     }
                     if ($is_ajax_request || $is_ajax_action) {
-                        ob_clean(); // Clear buffer before JSON
+                        ob_clean();
                         $response['message'] = $msg_text;
                         $_SESSION['header_cart_item_count'] = array_sum($_SESSION['cart']);
                         $response['cart_item_count'] = $_SESSION['header_cart_item_count'];
@@ -236,7 +264,7 @@ if (isset($db) && $db instanceof PDO) {
                          $response['type'] = 'info'; $response['success'] = false;
                     }
                     if ($is_ajax_request || $is_ajax_action) {
-                        ob_clean(); // Clear buffer before JSON
+                        ob_clean();
                         $response['message'] = $msg_text;
                         $_SESSION['header_cart_item_count'] = array_sum($_SESSION['cart']);
                         $response['cart_item_count'] = $_SESSION['header_cart_item_count'];
@@ -250,8 +278,8 @@ if (isset($db) && $db instanceof PDO) {
         } elseif (!$product_is_active_db) {
             $msg_text = "Sorry, '{$product_name_for_message_db}' is not currently active and cannot be added/updated in cart.";
             if ($is_ajax_request || $is_ajax_action) {
-                ob_clean(); // Clear buffer before JSON
-                $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
+                ob_clean();
+                $response['message'] = $msg['message']; $response['success'] = false; $response['type'] = 'error';
                 echo json_encode($response); exit;
             } else {
                 $cart_action_message .= "<div class='form-message error-message'>{$msg_text}</div>";
@@ -530,7 +558,7 @@ if (!($is_ajax_request || $is_ajax_action)) {
                         <p><strong>Subtotal:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($cart_subtotal, 2)); ?></span></p>
                         <p><strong>Items in Cart:</strong> <span><?php echo esc_html($cart_total_items); ?></span></p>
                         <hr>
-                        <p class="grand-total"><strong>Grand Total:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($grand_total, 2)); ?></span></p>
+                        <p class="grand-total"><strong>Total:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($grand_total, 2)); ?></span></p>
                         <a href="<?php echo rtrim(SITE_URL, '/'); ?>/checkout.php" class="btn btn-primary btn-lg btn-block mt-3">
                             Proceed to Checkout
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-arrow-right-circle-fill" viewBox="0 0 16 16" style="margin-left:8px; vertical-align: text-bottom;">
@@ -555,20 +583,4 @@ if (file_exists($footer_path)) {
     die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path));
 }
 ?>
-
-<script>
-// This script block is only for the full cart page.
-// It was incorrectly copied to this section in previous iterations,
-// but it's not relevant for the AJAX response logic.
-// The main site-wide JavaScript (script.js) now handles AJAX add to cart.
-document.addEventListener('DOMContentLoaded', function() {
-    const quantityInputs = document.querySelectorAll('.quantity-input');
-    quantityInputs.forEach(input => {
-        input.addEventListener('change', function() {
-            // This is client-side, the actual cart update on full page is handled by the form submit.
-            // No direct AJAX call here for individual quantity change as per current design.
-        });
-    });
-});
-</script>
 <?php } // End of if(!($is_ajax_request || $is_ajax_action)) ?>

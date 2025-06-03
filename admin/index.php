@@ -1,22 +1,20 @@
 <?php
 // admin/index.php - Super Admin Dashboard
 
-$admin_base_url = '.'; 
-$main_config_path = dirname(__DIR__) . '/src/config/config.php'; 
+$admin_base_url = '.';
+$main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
     die("CRITICAL ADMIN DASHBOARD ERROR: Main config.php not found.");
 }
 
-require_once 'auth_check.php'; 
+require_once 'auth_check.php';
 
 $admin_page_title = "Sales Dashboard";
-// We will include Chart.js CDN directly in this file's HTML,
-// so no need to pass $include_chart_js to header/footer for now.
-include_once 'includes/header.php'; 
+include_once 'includes/header.php';
 
-$db = getPDOConnection(); 
+$db = getPDOConnection();
 
 // --- Fetch Basic Stat Card Data ---
 $total_sales = 0;
@@ -50,7 +48,7 @@ try {
     $pending_brands_count = $pending_brands_data['count_pending'] ?? 0;
 
     // Recent Orders (last 5)
-    $stmt_recent_orders = $db->query("SELECT o.order_id, o.customer_id, o.order_date, o.total_amount, o.order_status, 
+    $stmt_recent_orders = $db->query("SELECT o.order_id, o.customer_id, o.order_date, o.total_amount, o.order_status,
                                           u.username as customer_username
                                      FROM orders o
                                      JOIN users u ON o.customer_id = u.user_id
@@ -59,18 +57,18 @@ try {
 
     // Sales by Brand (Top 5)
     $stmt_sales_by_brand = $db->query("
-        SELECT 
-            b.brand_id, 
-            b.brand_name, 
+        SELECT
+            b.brand_id,
+            b.brand_name,
             SUM(oi.subtotal_for_item) as total_brand_sales,
             COUNT(DISTINCT oi.order_id) as total_brand_orders
         FROM order_items oi
         JOIN brands b ON oi.brand_id = b.brand_id
         JOIN orders o ON oi.order_id = o.order_id
-        WHERE o.order_status NOT IN ('cancelled', 'refunded', 'pending_payment') 
+        WHERE o.order_status NOT IN ('cancelled', 'refunded', 'pending_payment')
         GROUP BY b.brand_id, b.brand_name
         ORDER BY total_brand_sales DESC
-        LIMIT 5 
+        LIMIT 5
     ");
     $sales_by_brand = $stmt_sales_by_brand->fetchAll(PDO::FETCH_ASSOC);
 
@@ -84,7 +82,7 @@ try {
         $month_year_obj = new DateTime("first day of -$i months");
         $month_year = $month_year_obj->format('Y-m');
         $chart_months[] = $month_year_obj->format('M Y'); // For labels e.g. "Jan 2023"
-        
+
         // Sales for the month
         $stmt_monthly_sales = $db->prepare("SELECT SUM(total_amount) as monthly_total FROM orders WHERE DATE_FORMAT(order_date, '%Y-%m') = :month_year AND order_status NOT IN ('cancelled', 'refunded', 'pending_payment')");
         $stmt_monthly_sales->bindParam(':month_year', $month_year);
@@ -98,7 +96,7 @@ try {
         $stmt_monthly_orders->execute();
         $orders_result = $stmt_monthly_orders->fetch(PDO::FETCH_ASSOC);
         $orders_data[] = $orders_result['monthly_orders'] ?? 0;
-        
+
         // New users for the month
         $stmt_monthly_users = $db->prepare("SELECT COUNT(user_id) as monthly_users FROM users WHERE DATE_FORMAT(created_at, '%Y-%m') = :month_year");
         $stmt_monthly_users->bindParam(':month_year', $month_year);
@@ -114,7 +112,10 @@ try {
 
 ?>
 
-<h1 class="admin-page-title"><?php echo htmlspecialchars($admin_page_title); ?></h1>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1 class="admin-page-title" style="margin-bottom: 0;"><?php echo htmlspecialchars($admin_page_title); ?></h1>
+    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/index.php" class="btn-submit" style="padding: 8px 15px; text-decoration:none; background-color: #6c757d; border-color: #6c757d;">Back to Site</a>
+</div>
 
 <div class="stat-cards-container">
     <div class="stat-card total-sales">
@@ -127,7 +128,7 @@ try {
         <p class="stat-value"><?php echo htmlspecialchars(number_format($total_orders)); ?></p>
         <p class="stat-description">Successful orders.</p>
     </div>
-    <div class="stat-card average-order"> 
+    <div class="stat-card average-order">
         <h3>Average Order Value</h3>
         <p class="stat-value"><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($average_order_value, 2)); ?></p>
         <p class="stat-description">Per successful order.</p>
@@ -322,7 +323,7 @@ document.addEventListener('DOMContentLoaded', function () {
             options: defaultChartOptions // Use default options
         });
     }
-    
+
     // New Users Chart
     if (document.getElementById('usersChart')) {
         new Chart(document.getElementById('usersChart'), {
@@ -343,11 +344,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     ...defaultChartOptions.scales,
                     y: {
                         ...defaultChartOptions.scales.y,
-                        ticks: { 
+                        ticks: {
                             stepSize: 1, // Ensure y-axis shows whole numbers for users
                             precision: 0 // No decimal places for user count
-                        } 
-                    } 
+                        }
+                    }
                 }
             }
         });
@@ -356,5 +357,5 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <?php
-include_once 'includes/footer.php'; 
+include_once 'includes/footer.php';
 ?>
