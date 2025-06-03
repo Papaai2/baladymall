@@ -1,8 +1,8 @@
 <?php
 // admin/edit_user.php - Super Admin User Management (Edit User)
 
-$admin_base_url = '.'; 
-$main_config_path = dirname(__DIR__) . '/src/config/config.php'; 
+$admin_base_url = '.';
+$main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
@@ -67,7 +67,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user']) && $use
     if (!in_array($new_role, $available_roles)) {
         $errors['role'] = "Invalid role selected.";
     }
-    
+
     // Prevent self-demotion or deactivation for the currently logged-in super admin
     if ($user_id_to_edit === $_SESSION['user_id']) {
         if ($new_role !== 'super_admin') {
@@ -106,13 +106,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user']) && $use
 
 
             if (empty($errors)) {
-                $update_sql = "UPDATE users SET 
-                                email = :email, 
-                                first_name = :first_name, 
-                                last_name = :last_name, 
+                $update_sql = "UPDATE users SET
+                                email = :email,
+                                first_name = :first_name,
+                                last_name = :last_name,
                                 phone_number = :phone_number,
-                                role = :role, 
-                                is_active = :is_active 
+                                role = :role,
+                                is_active = :is_active
                                WHERE user_id = :user_id";
                 $stmt_update = $db->prepare($update_sql);
                 $stmt_update->bindParam(':email', $new_email);
@@ -125,7 +125,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user']) && $use
 
                 if ($stmt_update->execute()) {
                     $_SESSION['user_management_message'] = "<div class='admin-message success'>User '" . htmlspecialchars($user_data['username']) . "' updated successfully.</div>";
-                    
+
                     // If a user is made a brand_admin, you might need to create a corresponding brand entry
                     // or have a separate workflow for that. For now, this just changes the role.
                     if ($user_data['role'] !== 'brand_admin' && $new_role === 'brand_admin') {
@@ -158,6 +158,49 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_user']) && $use
     }
 }
 
+// Handle password reset submission
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset_password']) && $user_data) {
+    $new_password = $_POST['new_password'] ?? '';
+    $confirm_new_password = $_POST['confirm_new_password'] ?? '';
+
+    $password_errors = [];
+
+    if (empty($new_password)) {
+        $password_errors['new_password'] = "New password is required.";
+    } elseif (strlen($new_password) < 8) {
+        $password_errors['new_password'] = "New password must be at least 8 characters long.";
+    } elseif ($new_password !== $confirm_new_password) {
+        $password_errors['confirm_new_password'] = "Passwords do not match.";
+    }
+
+    if (empty($password_errors)) {
+        try {
+            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+            $stmt_update_password = $db->prepare("UPDATE users SET password = :password, updated_at = NOW() WHERE user_id = :user_id");
+            $stmt_update_password->bindParam(':password', $hashed_password);
+            $stmt_update_password->bindParam(':user_id', $user_id_to_edit, PDO::PARAM_INT);
+
+            if ($stmt_update_password->execute()) {
+                $_SESSION['user_management_message'] = "<div class='admin-message success'>Password for '" . htmlspecialchars($user_data['username']) . "' reset successfully.</div>";
+                header("Location: users.php"); // Redirect to user list after password reset
+                exit;
+            } else {
+                $message = "<div class='admin-message error'>Failed to reset password.</div>";
+            }
+        } catch (PDOException $e) {
+            error_log("Admin Edit User - Password reset error: " . $e->getMessage());
+            $message = "<div class='admin-message error'>An error occurred while resetting password.</div>";
+        }
+    } else {
+        $message = "<div class='admin-message error'>Please correct the password errors below.</div>";
+        // Ensure $errors is an array before merging
+        if (!isset($errors)) {
+            $errors = [];
+        }
+        $errors = array_merge($errors, $password_errors); // Merge password errors for display
+    }
+}
+
 
 include_once 'includes/header.php';
 ?>
@@ -169,61 +212,80 @@ include_once 'includes/header.php';
 
 <?php if ($user_data): ?>
     <form action="edit_user.php?user_id=<?php echo $user_id_to_edit; ?>" method="POST" class="admin-form" style="max-width: 600px;">
-        <div class="form-group">
-            <label for="username">Username (cannot be changed)</label>
-            <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($user_data['username']); ?>" readonly disabled>
-        </div>
+        <fieldset>
+            <legend>User Profile Details</legend>
+            <div class="form-group">
+                <label for="username">Username (cannot be changed)</label>
+                <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($user_data['username']); ?>" readonly disabled>
+            </div>
 
-        <div class="form-group">
-            <label for="email">Email Address <span style="color:red;">*</span></label>
-            <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($user_data['email']); ?>" required>
-            <?php if (isset($errors['email'])): ?><small style="color:red;"><?php echo $errors['email']; ?></small><?php endif; ?>
-        </div>
+            <div class="form-group">
+                <label for="email">Email Address <span style="color:red;">*</span></label>
+                <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($user_data['email']); ?>" required>
+                <?php if (isset($errors['email'])): ?><small style="color:red;"><?php echo $errors['email']; ?></small><?php endif; ?>
+            </div>
 
-        <div class="form-group">
-            <label for="first_name">First Name</label>
-            <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($user_data['first_name']); ?>">
-            <?php if (isset($errors['first_name'])): ?><small style="color:red;"><?php echo $errors['first_name']; ?></small><?php endif; ?>
-        </div>
+            <div class="form-group">
+                <label for="first_name">First Name</label>
+                <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($user_data['first_name']); ?>">
+                <?php if (isset($errors['first_name'])): ?><small style="color:red;"><?php echo $errors['first_name']; ?></small><?php endif; ?>
+            </div>
 
-        <div class="form-group">
-            <label for="last_name">Last Name</label>
-            <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($user_data['last_name']); ?>">
-            <?php if (isset($errors['last_name'])): ?><small style="color:red;"><?php echo $errors['last_name']; ?></small><?php endif; ?>
-        </div>
-        
-        <div class="form-group">
-            <label for="phone_number">Phone Number</label>
-            <input type="tel" id="phone_number" name="phone_number" value="<?php echo htmlspecialchars($user_data['phone_number']); ?>">
-            <?php if (isset($errors['phone_number'])): ?><small style="color:red;"><?php echo $errors['phone_number']; ?></small><?php endif; ?>
-        </div>
+            <div class="form-group">
+                <label for="last_name">Last Name</label>
+                <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($user_data['last_name']); ?>">
+                <?php if (isset($errors['last_name'])): ?><small style="color:red;"><?php echo $errors['last_name']; ?></small><?php endif; ?>
+            </div>
 
-        <div class="form-group">
-            <label for="role">Role <span style="color:red;">*</span></label>
-            <select id="role" name="role" required>
-                <?php foreach ($available_roles as $role_value): ?>
-                    <option value="<?php echo $role_value; ?>" <?php echo ($user_data['role'] === $role_value) ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars(ucfirst(str_replace('_', ' ', $role_value))); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <?php if (isset($errors['role'])): ?><small style="color:red;"><?php echo $errors['role']; ?></small><?php endif; ?>
-        </div>
+            <div class="form-group">
+                <label for="phone_number">Phone Number</label>
+                <input type="tel" id="phone_number" name="phone_number" value="<?php echo htmlspecialchars($user_data['phone_number']); ?>">
+                <?php if (isset($errors['phone_number'])): ?><small style="color:red;"><?php echo $errors['phone_number']; ?></small><?php endif; ?>
+            </div>
 
-        <div class="form-group">
-            <label for="is_active">
-                <input type="checkbox" id="is_active" name="is_active" value="1" <?php echo ($user_data['is_active'] == 1) ? 'checked' : ''; ?>>
-                Account Active
-            </label>
-            <?php if (isset($errors['is_active'])): ?><small style="color:red; display:block;"><?php echo $errors['is_active']; ?></small><?php endif; ?>
-        </div>
-        
-        <div class="form-group">
-            <p><small>Password can be changed by the user via "Forgot Password" or their account settings. Admins typically do not set user passwords directly here for security reasons, unless implementing a password reset feature.</small></p>
-        </div>
+            <div class="form-group">
+                <label for="role">Role <span style="color:red;">*</span></label>
+                <select id="role" name="role" required>
+                    <?php foreach ($available_roles as $role_value): ?>
+                        <option value="<?php echo $role_value; ?>" <?php echo ($user_data['role'] === $role_value) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars(ucfirst(str_replace('_', ' ', $role_value))); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php if (isset($errors['role'])): ?><small style="color:red;"><?php echo $errors['role']; ?></small><?php endif; ?>
+            </div>
 
-        <button type="submit" name="update_user" class="btn-submit">Update User</button>
+            <div class="form-group">
+                <label for="is_active">
+                    <input type="checkbox" id="is_active" name="is_active" value="1" <?php echo ($user_data['is_active'] == 1) ? 'checked' : ''; ?>>
+                    Account Active
+                </label>
+                <?php if (isset($errors['is_active'])): ?><small style="color:red; display:block;"><?php echo $errors['is_active']; ?></small><?php endif; ?>
+            </div>
+
+            <button type="submit" name="update_user" class="btn-submit">Update User Profile</button>
+        </fieldset>
     </form>
+
+    <form action="edit_user.php?user_id=<?php echo $user_id_to_edit; ?>" method="POST" class="admin-form" style="max-width: 600px; margin-top: 30px;">
+        <fieldset>
+            <legend>Reset Password</legend>
+            <p><small>A new password will be set for this user. The current password is not required.</small></p>
+            <div class="form-group">
+                <label for="new_password">New Password <span style="color:red;">*</span></label>
+                <input type="password" id="new_password" name="new_password" required>
+                <?php if (isset($errors['new_password'])): ?><small style="color:red;"><?php echo $errors['new_password']; ?></small><?php endif; ?>
+            </div>
+            <div class="form-group">
+                <label for="confirm_new_password">Confirm New Password <span style="color:red;">*</span></label>
+                <input type="password" id="confirm_new_password" name="confirm_new_password" required>
+                <?php if (isset(
+                    $errors['confirm_new_password'])): ?><small style="color:red;"><?php echo $errors['confirm_new_password']; ?></small><?php endif; ?>
+            </div>
+            <button type="submit" name="reset_password" class="btn-submit btn-suspend">Reset Password</button>
+        </fieldset>
+    </form>
+
 <?php else: ?>
     <?php if (empty($message)): ?>
     <p class="admin-message error">User data could not be loaded.</p>

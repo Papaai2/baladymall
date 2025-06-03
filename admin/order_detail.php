@@ -1,8 +1,8 @@
 <?php
 // admin/order_detail.php - Super Admin: View Order Details
 
-$admin_base_url = '.'; 
-$main_config_path = dirname(__DIR__) . '/src/config/config.php'; 
+$admin_base_url = '.';
+$main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
@@ -53,7 +53,7 @@ try {
     // Fetch order items
     // Joining with products and product_variants (if variant_id is present)
     $sql_items = "SELECT oi.*, p.product_name, p.main_image_url as product_main_image,
-                         pv.variant_sku, pv.variant_image_url, 
+                         pv.variant_sku, pv.variant_image_url,
                          GROUP_CONCAT(av.value ORDER BY a.attribute_name SEPARATOR ', ') as variant_attributes
                   FROM order_items oi
                   JOIN products p ON oi.product_id = p.product_id
@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_order_status']
             $stmt_update_status = $db->prepare("UPDATE orders SET order_status = :status, updated_at = NOW() WHERE order_id = :order_id");
             $stmt_update_status->bindParam(':status', $new_status);
             $stmt_update_status->bindParam(':order_id', $order_id, PDO::PARAM_INT);
-            
+
             if ($stmt_update_status->execute()) {
                 $_SESSION['admin_message'] = "<div class='admin-message success'>Order #{$order_id} status updated to '" . htmlspecialchars(ucwords(str_replace('_', ' ', $new_status))) . "'.</div>";
                 // Refresh order data
@@ -102,6 +102,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_order_status']
                 // No full page redirect, just update message and potentially the displayed status
                 $message = $_SESSION['admin_message']; // Display message immediately
                 unset($_SESSION['admin_message']);
+
+                // --- Send Order Status Update Email to Customer (if status changed) ---
+                if ($new_status !== $order['order_status']) { // Check if status actually changed
+                    $customer_email_subject = SITE_NAME . " - Order #{$order_id} Status Updated";
+                    $customer_email_body = "Hello " . htmlspecialchars($customer['username'] ?? 'Customer') . ",\n\n";
+                    $customer_email_body .= "The status of your order #{$order_id} on " . SITE_NAME . " has been updated to: " . htmlspecialchars(ucwords(str_replace('_', ' ', $new_status))) . "\n\n";
+                    $customer_email_body .= "You can view your order details here: " . rtrim(SITE_URL, '/') . "/order_detail.php?order_id=" . $order_id . "\n\n";
+                    $customer_email_body .= "Regards,\n" . SITE_NAME . " Team";
+
+                    error_log("CUSTOMER ORDER STATUS UPDATE EMAIL for {$customer['email']} (Order #{$order_id}):\nSubject: {$customer_email_subject}\nBody:\n{$customer_email_body}\n");
+                }
+
+
             } else {
                 $message = "<div class='admin-message error'>Failed to update order status.</div>";
             }
@@ -133,12 +146,12 @@ $csrf_token = $_SESSION['csrf_token'];
 
 <?php if ($order): ?>
     <div class="order-detail-container" style="display: flex; flex-wrap: wrap; gap: 20px;">
-        
+
         <div class="order-summary-section admin-form" style="flex: 1 1 350px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h2 style="margin-top:0;">Order Summary</h2>
             <p><strong>Order ID:</strong> #<?php echo htmlspecialchars($order['order_id']); ?></p>
             <p><strong>Order Date:</strong> <?php echo htmlspecialchars(date("F j, Y, g:i a", strtotime($order['order_date']))); ?></p>
-            <p><strong>Current Status:</strong> 
+            <p><strong>Current Status:</strong>
                 <span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $order['order_status']))); ?>" style="font-weight:bold;">
                     <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $order['order_status']))); ?>
                 </span>
@@ -213,9 +226,18 @@ $csrf_token = $_SESSION['csrf_token'];
                     <?php foreach ($order_items as $item): ?>
                         <tr>
                             <td>
-                                <?php 
+                                <?php
                                 $item_image_url = $item['variant_image_url'] ?: $item['product_main_image'];
-                                $image_path = $item_image_url ? htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $item_image_url) : htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=No+Img');
+                                $image_path = '';
+                                if (!empty($item_image_url)) {
+                                    if (filter_var($item_image_url, FILTER_VALIDATE_URL)) {
+                                        $image_path = htmlspecialchars($item_image_url);
+                                    } else {
+                                        $image_path = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $item_image_url);
+                                    }
+                                } else {
+                                    $image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=No+Img');
+                                }
                                 $fallback_image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=Error');
                                 ?>
                                 <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($item['product_name']); ?>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">

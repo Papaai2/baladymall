@@ -25,14 +25,13 @@ $categories_list = [];
 $page_error_message = '';
 
 try {
-    // Fetch only top-level categories first. Sub-categories can be handled later or on individual category pages.
-    // Or, fetch all and display hierarchically. For simplicity, let's start with top-level.
-    // To show all categories and indicate parentage:
+    // Fetch all categories, linking to parent category name for display.
+    // This query includes both top-level and sub-categories and their product counts.
     $stmt = $db->query("
-        SELECT 
-            c.category_id, 
-            c.category_name, 
-            c.category_description, 
+        SELECT
+            c.category_id,
+            c.category_name,
+            c.category_description,
             c.category_image_url,
             (SELECT COUNT(*) FROM product_category pc JOIN products p ON pc.product_id = p.product_id WHERE pc.category_id = c.category_id AND p.is_active = 1) as product_count,
             p.category_name as parent_category_name
@@ -40,9 +39,7 @@ try {
         LEFT JOIN categories p ON c.parent_category_id = p.category_id
         ORDER BY p.category_name ASC, c.category_name ASC
     ");
-    // If you only want top-level categories:
-    // $stmt = $db->query("SELECT category_id, category_name, category_description, category_image_url, (SELECT COUNT(*) FROM product_category pc JOIN products p ON pc.product_id = p.product_id WHERE pc.category_id = categories.category_id AND p.is_active = 1) as product_count FROM categories WHERE parent_category_id IS NULL ORDER BY category_name ASC");
-    
+
     $categories_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
@@ -71,38 +68,40 @@ try {
                 <?php foreach ($categories_list as $category): ?>
                     <?php
                         // Link to products.php, passing category_id to filter
-                        $category_url = rtrim(SITE_URL, '/') . "/products.php?category_id=" . htmlspecialchars($category['category_id']); 
-                        
+                        $category_url = rtrim(SITE_URL, '/') . "/products.php?category_id=" . htmlspecialchars($category['category_id']);
+
                         $image_path = !empty($category['category_image_url']) ? htmlspecialchars($category['category_image_url']) : '';
-                        
+
+                        // Corrected: Use PUBLIC_UPLOADS_URL_BASE for uploaded images
                         if (!empty($image_path) && (strpos($image_path, 'http://') === 0 || strpos($image_path, 'https://') === 0)) {
-                            $image_url = $image_path; // It's a full URL
-                        } elseif (!empty($image_path)) {
-                            // It's a relative path from 'uploads/', SITE_URL points to 'public/'
-                            $image_url = PUBLIC_UPLOADS_URL_BASE . ltrim($image_path, '/');
+                            $image_url = $image_path; // It's a full URL already
+                        } elseif (!empty($image_path) && defined('PUBLIC_UPLOADS_URL_BASE')) {
+                            // It's a relative path, prepend PUBLIC_UPLOADS_URL_BASE
+                            $image_url = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim($image_path, '/');
                         } else {
                             // Fallback placeholder image
-                            $image_url = PLACEHOLDER_IMAGE_URL_GENERATOR . "300x200/E0E0E0/777?text=" . urlencode(htmlspecialchars($category['category_name']));
+                            $image_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/E0E0E0/777?text=" . urlencode(htmlspecialchars($category['category_name'])) : 'https://placehold.co/300x200/E0E0E0/777?text=No+Image';
                         }
-                        $fallback_image_url = PLACEHOLDER_IMAGE_URL_GENERATOR . "300x200/E0E0E0/777?text=Image+Error";
+                        $fallback_image_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/CCC/777?text=Image+Error" : 'https://placehold.co/300x200/CCC/777?text=Image+Error';
                     ?>
                     <div class="category-item animate-on-scroll">
                         <a href="<?php echo $category_url; ?>">
-                            <img src="<?php echo $image_url; ?>" 
+                            <img src="<?php echo $image_url; ?>"
                                  alt="<?php echo htmlspecialchars($category['category_name']); ?>"
                                  onerror="this.onerror=null;this.src='<?php echo $fallback_image_url; ?>';"
                                  class="rounded-md shadow-sm">
                             <h3><?php echo htmlspecialchars($category['category_name']); ?></h3>
                         </a>
-                        <?php if(!empty($category['parent_category_name'])): ?>
-                            <p class="parent-category-info"><small>In: <?php echo htmlspecialchars($category['parent_category_name']); ?></small></p>
-                        <?php endif; ?>
-                        <p class="category-description">
-                            <?php echo !empty($category['category_description']) ? htmlspecialchars(substr($category['category_description'], 0, 100)) . (strlen($category['category_description']) > 100 ? '...' : '') : 'Explore products in this category.'; ?>
-                        </p>
-                        <p class="product-count-info">
-                            <small><?php echo htmlspecialchars($category['product_count']); ?> Product(s)</small>
-                        </p>
+                        <div class="item-content-wrapper"> <?php if(!empty($category['parent_category_name'])): ?>
+                                <p class="parent-category-info"><small>In: <?php echo htmlspecialchars($category['parent_category_name']); ?></small></p>
+                            <?php endif; ?>
+                            <p class="category-description">
+                                <?php echo !empty($category['category_description']) ? htmlspecialchars(substr($category['category_description'], 0, 100)) . (strlen($category['category_description']) > 100 ? '...' : '') : 'Explore products in this category.'; ?>
+                            </p>
+                            <p class="product-count-info">
+                                <small><?php echo htmlspecialchars($category['product_count']); ?> Product(s)</small>
+                            </p>
+                        </div>
                         <a href="<?php echo $category_url; ?>" class="btn btn-sm btn-outline-primary mt-auto">View Products</a>
                     </div>
                 <?php endforeach; ?>

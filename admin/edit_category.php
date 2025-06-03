@@ -1,8 +1,8 @@
 <?php
 // admin/edit_category.php - Super Admin: Edit Category
 
-$admin_base_url = '.'; 
-$main_config_path = dirname(__DIR__) . '/src/config/config.php'; 
+$admin_base_url = '.';
+$main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
@@ -48,7 +48,8 @@ try {
 
 // Initialize form variables with existing category data
 $category_name_form = $category['category_name'];
-$category_description_form = $category['category_description'];
+// FIX: Coalesce null to empty string for htmlspecialchars safety
+$category_description_form = $category['category_description'] ?? '';
 $parent_category_id_form = $category['parent_category_id'];
 $current_category_image_url = $category['category_image_url'];
 $admin_page_title = "Edit Category: " . htmlspecialchars($category['category_name']);
@@ -70,7 +71,8 @@ try {
 // --- Handle Form Submission for Update ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
     $category_name_form = trim(filter_input(INPUT_POST, 'category_name', FILTER_UNSAFE_RAW));
-    $category_description_form = trim(filter_input(INPUT_POST, 'category_description', FILTER_UNSAFE_RAW));
+    // FIX: Ensure description from POST is not null before using
+    $category_description_form = trim(filter_input(INPUT_POST, 'category_description', FILTER_UNSAFE_RAW) ?? '');
     $new_parent_category_id_form = filter_input(INPUT_POST, 'parent_category_id', FILTER_VALIDATE_INT);
 
     if ($new_parent_category_id_form === 0 || $new_parent_category_id_form === false) {
@@ -158,23 +160,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
 
     if (empty($errors)) {
         try {
-            $sql_update_category = "UPDATE categories SET 
-                                    category_name = :category_name, 
-                                    category_description = :category_description, 
-                                    parent_category_id = :parent_category_id, 
-                                    category_image_url = :category_image_url, 
+            $sql_update_category = "UPDATE categories SET
+                                    category_name = :category_name,
+                                    category_description = :category_description,
+                                    parent_category_id = :parent_category_id,
+                                    category_image_url = :category_image_url,
                                     updated_at = NOW()
                                    WHERE category_id = :category_id";
             $stmt_update_category = $db->prepare($sql_update_category);
-            
+
             $params_update = [
                 ':category_name' => $category_name_form,
-                ':category_description' => $category_description_form ?: null,
+                ':category_description' => $category_description_form ?: null, // Use null for empty description in DB
                 ':parent_category_id' => $parent_category_id_form, // Use the validated parent ID
                 ':category_image_url' => $category_image_url_db_path_update,
                 ':category_id' => $category_id
             ];
-            
+
             if ($stmt_update_category->execute($params_update)) {
                 // Delete old image file if replaced and DB update was successful
                 if ($old_image_to_delete_on_success && file_exists($old_image_to_delete_on_success)) {
@@ -241,6 +243,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
         <div class="form-group">
             <label for="category_description">Category Description</label>
             <textarea id="category_description" name="category_description" rows="4"><?php echo htmlspecialchars($category_description_form); ?></textarea>
+            <?php // The description is now guaranteed to be a string (empty string if null) ?>
         </div>
 
         <div class="form-group">
@@ -251,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
             <?php else: ?>
                 <p>No image currently set for this category.</p>
             <?php endif; ?>
-            
+
             <label for="category_image_upload" style="margin-top:10px; display:block;">Upload New Image (Optional - Replaces current)</label>
             <input type="file" id="category_image_upload" name="category_image" accept="image/jpeg,image/png,image/gif,image/webp">
             <small>Recommended aspect ratio: 1:1 or 4:3. Max file size: <?php echo defined('MAX_IMAGE_SIZE') ? (MAX_IMAGE_SIZE/1024/1024) : '2'; ?>MB.</small>

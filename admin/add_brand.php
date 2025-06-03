@@ -1,8 +1,8 @@
 <?php
 // admin/add_brand.php - Super Admin: Add New Brand
 
-$admin_base_url = '.'; 
-$main_config_path = dirname(__DIR__) . '/src/config/config.php'; 
+$admin_base_url = '.';
+$main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
@@ -28,7 +28,7 @@ $db = getPDOConnection();
 // Fetch users with 'brand_admin' role who are not already assigned to a brand
 $available_brand_admins = [];
 try {
-    $stmt_admins = $db->query("SELECT u.user_id, u.username, u.first_name, u.last_name 
+    $stmt_admins = $db->query("SELECT u.user_id, u.username, u.first_name, u.last_name
                                FROM users u
                                LEFT JOIN brands b ON u.user_id = b.user_id
                                WHERE u.role = 'brand_admin' AND b.brand_id IS NULL AND u.is_active = 1
@@ -53,7 +53,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
     if (empty($user_id_form)) {
         $errors['user_id'] = "A Brand Admin user must be selected.";
     } else {
-        // Validate if the selected user_id is a valid, unassigned brand_admin
         $is_valid_admin_selection = false;
         foreach($available_brand_admins as $admin_user) {
             if ($admin_user['user_id'] == $user_id_form) {
@@ -61,10 +60,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
                 break;
             }
         }
-        if (!$is_valid_admin_selection && !empty($available_brand_admins)) { // Check if list wasn't empty
-             // If the selected user is not in the fetched list of available admins (could be due to form tampering or stale list)
-             // Re-fetch just this one user to double check their status if list was not empty.
-             // This is an extra check, usually the dropdown should be accurate.
+        if (!$is_valid_admin_selection && !empty($available_brand_admins)) {
             try {
                 $stmt_check_single_admin = $db->prepare("SELECT u.user_id FROM users u LEFT JOIN brands b ON u.user_id = b.user_id WHERE u.user_id = :uid AND u.role = 'brand_admin' AND b.brand_id IS NULL AND u.is_active = 1");
                 $stmt_check_single_admin->bindParam(':uid', $user_id_form, PDO::PARAM_INT);
@@ -90,6 +86,47 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
         $errors['commission_rate'] = "Commission rate must be between 0 and 100.";
     }
 
+    // --- NEW: Brand Logo Upload Handling ---
+    $brand_logo_url_db_path = null;
+    if (isset($_FILES['brand_logo']) && $_FILES['brand_logo']['error'] == UPLOAD_ERR_OK) {
+        $logo_file = $_FILES['brand_logo'];
+        $upload_dir = PUBLIC_UPLOADS_PATH . 'brands/'; // Target directory for brand logos
+
+        // Create directory if it doesn't exist
+        if (!is_dir($upload_dir)) {
+            if (!mkdir($upload_dir, 0775, true)) {
+                 $errors['brand_logo'] = "Failed to create brand logo upload directory.";
+            }
+        }
+
+        if (empty($errors['brand_logo'])) { // Only proceed if no directory creation error
+            $allowed_mime_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']; // Added SVG
+            $file_mime_type = mime_content_type($logo_file['tmp_name']);
+
+            if (!in_array($file_mime_type, $allowed_mime_types)) {
+                $errors['brand_logo'] = "Invalid logo file type. Allowed: JPG, PNG, GIF, WEBP, SVG.";
+            } elseif ($logo_file['size'] > MAX_IMAGE_SIZE) { // MAX_IMAGE_SIZE from config.php
+                $errors['brand_logo'] = "Logo file is too large. Max size: " . (MAX_IMAGE_SIZE / 1024 / 1024) . "MB.";
+            } else {
+                $file_extension = strtolower(pathinfo($logo_file['name'], PATHINFO_EXTENSION));
+                $safe_brand_name = preg_replace('/[^a-z0-9_-]/i', '-', strtolower($brand_name_form)); // Sanitize for filename
+                $new_filename = $safe_brand_name . '-logo-' . time() . '-' . bin2hex(random_bytes(4)) . '.' . $file_extension;
+                $destination = $upload_dir . $new_filename;
+
+                if (move_uploaded_file($logo_file['tmp_name'], $destination)) {
+                    $brand_logo_url_db_path = 'brands/' . $new_filename; // Relative path for DB
+                } else {
+                    $errors['brand_logo'] = "Failed to upload brand logo. Check permissions or server error.";
+                    error_log("Failed to move uploaded brand logo file: " . $logo_file['name'] . " to " . $destination);
+                }
+            }
+        }
+    } elseif (isset($_FILES['brand_logo']) && $_FILES['brand_logo']['error'] != UPLOAD_ERR_NO_FILE) {
+        // Handle other upload errors (e.g., UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE)
+        $errors['brand_logo'] = "Error uploading logo: " . $logo_file['error'];
+    }
+
+
     if (empty($errors)) {
         try {
             // Check if brand name already exists
@@ -101,13 +138,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
             }
 
             if (empty($errors)) {
-                $insert_sql = "INSERT INTO brands (user_id, brand_name, brand_description, brand_contact_email, brand_contact_phone, brand_website_url, commission_rate, is_approved, created_at, updated_at) 
-                               VALUES (:user_id, :brand_name, :brand_description, :brand_contact_email, :brand_contact_phone, :brand_website_url, :commission_rate, 1, NOW(), NOW())";
+                $insert_sql = "INSERT INTO brands (user_id, brand_name, brand_logo_url, brand_description, brand_contact_email, brand_contact_phone, brand_website_url, commission_rate, is_approved, created_at, updated_at)
+                               VALUES (:user_id, :brand_name, :brand_logo_url, :brand_description, :brand_contact_email, :brand_contact_phone, :brand_website_url, :commission_rate, 1, NOW(), NOW())";
                 $stmt_insert = $db->prepare($insert_sql);
-                
+
                 $params_insert = [
                     ':user_id' => $user_id_form,
                     ':brand_name' => $brand_name_form,
+                    ':brand_logo_url' => $brand_logo_url_db_path, // NEW: Include logo URL
                     ':brand_description' => $brand_description_form ?: null,
                     ':brand_contact_email' => $brand_contact_email_form ?: null,
                     ':brand_contact_phone' => $brand_contact_phone_form ?: null,
@@ -117,21 +155,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
 
                 if ($stmt_insert->execute($params_insert)) {
                     $new_brand_id = $db->lastInsertId();
-                    $_SESSION['brand_management_message'] = "<div class='admin-message success'>Brand '" . htmlspecialchars($brand_name_form) . "' added successfully (ID: {$new_brand_id}).</div>";
+                    $_SESSION['admin_message'] = "<div class='admin-message success'>Brand '" . htmlspecialchars($brand_name_form) . "' added successfully (ID: {$new_brand_id}).</div>";
                     header("Location: brands.php");
                     exit;
                 } else {
+                    // If DB insert failed, delete uploaded logo to prevent orphaned files
+                    if ($brand_logo_url_db_path && file_exists(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path)) {
+                        @unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+                    }
                     $message = "<div class='admin-message error'>Failed to add new brand.</div>";
                 }
             }
         } catch (PDOException $e) {
             error_log("Admin Add Brand - Error inserting brand: " . $e->getMessage());
-            if ($e->getCode() == '23000') { 
+            // If DB insert failed due to exception, delete uploaded logo
+            if ($brand_logo_url_db_path && file_exists(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path)) {
+                @unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+            }
+            if ($e->getCode() == '23000') {
                  $message = "<div class='admin-message error'>Operation failed. The brand name or assigned user might already be in use in a conflicting way.</div>";
             } else {
                 $message = "<div class='admin-message error'>An error occurred while adding the brand.</div>";
             }
         }
+    } else {
+        $message = "<div class='admin-message error'>Please correct the errors below and try again.</div>";
     }
 }
 
@@ -143,7 +191,7 @@ include_once 'includes/header.php';
 
 <?php if ($message) echo $message; ?>
 
-<form action="add_brand.php" method="POST" class="admin-form" style="max-width: 700px;">
+<form action="add_brand.php" method="POST" class="admin-form" enctype="multipart/form-data" style="max-width: 700px;">
     <fieldset>
         <legend>Brand Details</legend>
         <div class="form-group">
@@ -155,6 +203,13 @@ include_once 'includes/header.php';
         <div class="form-group">
             <label for="brand_description">Brand Description</label>
             <textarea id="brand_description" name="brand_description" rows="5"><?php echo htmlspecialchars($brand_description_form); ?></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="brand_logo">Brand Logo (Optional)</label>
+            <input type="file" id="brand_logo" name="brand_logo" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml">
+            <small>Recommended: Square logo. Max file size: <?php echo defined('MAX_IMAGE_SIZE') ? (MAX_IMAGE_SIZE/1024/1024) : '5'; ?>MB.</small>
+            <?php if (isset($errors['brand_logo'])): ?><small style="color:red;"><?php echo $errors['brand_logo']; ?></small><?php endif; ?>
         </div>
     </fieldset>
 
@@ -202,7 +257,7 @@ include_once 'includes/header.php';
             <?php if (isset($errors['commission_rate'])): ?><small style="color:red;"><?php echo $errors['commission_rate']; ?></small><?php endif; ?>
             <small>Enter a percentage, e.g., 10 for 10%. Leave blank if not applicable yet.</small>
         </div>
-        
+
         <p><small>Brands added via this form are automatically <strong>approved</strong>.</small></p>
     </fieldset>
 

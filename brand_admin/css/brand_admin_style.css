@@ -1,0 +1,527 @@
+/* brand_admin/css/brand_admin_style.css */
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    background-color: #e8edf2; /* Slightly different background for brand admin */
+    color: #343a40;
+    line-height: 1.6;
+    font-size: 15px;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+    transition: color 0.2s ease-in-out;
+}
+a:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.brand-admin-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* --- Brand Admin Header --- */
+.brand-admin-header {
+    background-color: #3f51b5; /* A shade of indigo */
+    color: #ffffff;
+    padding: 0 25px;
+    border-bottom: 1px solid #303f9f;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.brand-admin-header-inner {
+    max-width: 100%;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 65px;
+}
+
+.brand-admin-logo a {
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 1.3em;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+.brand-admin-logo img {
+    max-height: 40px;
+    margin-right: 10px;
+    border-radius: 3px;
+}
+
+.brand-admin-main-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
+
+.brand-admin-main-nav li {
+    margin-left: 18px;
+    font-size: 0.95em;
+}
+.brand-admin-main-nav li:first-child {
+    color: #c5cae9; /* Lighter indigo */
+    font-weight: 500;
+    padding-right: 10px;
+}
+
+.brand-admin-main-nav a {
+    color: #c5cae9;
+    text-decoration: none;
+    padding: 10px 12px;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.brand-admin-main-nav a:hover,
+.brand-admin-main-nav a.active {
+    color: #ffffff;
+    background-color: #303f9f;
+    text-decoration: none;
+}
+.brand-admin-main-nav .logout-link {
+    color: #ff8a80; /* Light red for logout */
+    font-weight: 500;
+}
+.brand-admin-main-nav .logout-link:hover {
+    background-color: #d50000;
+    color: #fff;
+}
+
+
+/* --- Brand Admin Main Content --- */
+.brand-admin-main {
+    flex-grow: 1;
+    padding: 25px;
+}
+
+.brand-admin-container {
+    background-color: #ffffff;
+    padding: 20px 25px;
+    border-radius: 8px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+    max-width: 100%;
+}
+
+.brand-admin-footer {
+    text-align: center;
+    padding: 18px;
+    background-color: #e0e0e0;
+    border-top: 1px solid #bdbdbd;
+    font-size: 0.88em;
+    color: #616161;
+}
+
+/* Page Title */
+.brand-admin-page-title {
+    font-size: 1.8em;
+    color: #343a40;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: 600;
+}
+
+/* --- Stat Cards for Dashboard --- */
+.stat-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-left: 4px solid;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 12px rgba(0,0,0,0.08);
+}
+
+/* Colors for brand admin stats - can be different from super admin */
+.stat-card.total-sales { border-left-color: #4CAF50; } /* Green */
+.stat-card.total-orders { border-left-color: #2196F3; } /* Blue */
+.stat-card.average-order { border-left-color: #FFC107; } /* Amber */
+.stat-card.total-products { border-left-color: #9C27B0; } /* Purple */
+
+.stat-card h3 {
+    margin-top: 0;
+    font-size: 0.95em;
+    color: #6c757d;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 500;
+}
+
+.stat-card .stat-value {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #343a40;
+    margin-bottom: 8px;
+}
+
+.stat-card .stat-description {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+.stat-card .stat-link a {
+    font-size: 0.9em;
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+}
+.stat-card .stat-link a:hover {
+    text-decoration: underline;
+}
+
+
+/* --- Brand Admin Table Styling --- */
+.brand-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 0.92em;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.brand-admin-table th,
+.brand-admin-table td {
+    border-bottom: 1px solid #e9ecef;
+    padding: 10px 14px;
+    text-align: left;
+    vertical-align: middle;
+}
+.brand-admin-table td:first-child, .brand-admin-table th:first-child {
+    padding-left: 18px;
+}
+.brand-admin-table td:last-child, .brand-admin-table th:last-child {
+    padding-right: 18px;
+}
+
+.brand-admin-table thead th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+    font-size: 0.8em;
+    letter-spacing: 0.4px;
+    border-bottom-width: 2px;
+    border-bottom-color: #dee2e6;
+}
+.brand-admin-table tbody tr:nth-child(even) {
+    background-color: #fcfcfc;
+}
+.brand-admin-table tbody tr:hover {
+    background-color: #f1f3f7;
+}
+.brand-admin-table .actions a, .brand-admin-table .actions button {
+    margin-right: 6px;
+    padding: 5px 9px;
+    font-size: 0.82em;
+    text-decoration: none;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+.brand-admin-table .actions a:last-child, .brand-admin-table .actions button:last-child {
+    margin-right: 0;
+}
+
+/* Consistent Button Styles (used in tables and forms) */
+.btn-edit, .btn-approve, .btn-suspend, .btn-view, .btn-submit, .brand-admin-filters button,
+.brand-admin-table .actions .btn-edit,
+.brand-admin-table .actions .btn-approve,
+.brand-admin-table .actions .btn-suspend,
+.brand-admin-table .actions .btn-view,
+.brand-admin-form .btn-submit,
+.brand-admin-filters button,
+.brand-admin-page-title + a.btn-submit,
+.brand-admin-container > p > a.btn-submit
+ {
+    display: inline-block;
+    font-weight: 500;
+    text-align: center;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+    border-radius: 0.25rem;
+    transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+.btn-edit:hover, .btn-approve:hover, .btn-suspend:hover, .btn-view:hover, .btn-submit:hover,
+.brand-admin-filters button:hover, .brand-admin-page-title + a.btn-submit:hover,
+.brand-admin-container > p > a.btn-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+
+.btn-edit { color: #212529; background-color: #ffc107; border-color: #ffc107; }
+.btn-edit:hover { background-color: #e0a800; border-color: #d39e00; color: #212529; }
+
+.btn-approve { color: #fff; background-color: #28a745; border-color: #28a745; }
+.btn-approve:hover { background-color: #218838; border-color: #1e7e34; color: #fff; }
+
+.btn-suspend { color: #fff; background-color: #dc3545; border-color: #dc3545; }
+.btn-suspend:hover { background-color: #c82333; border-color: #bd2130; color: #fff; }
+
+.btn-view { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
+.btn-view:hover { background-color: #138496; border-color: #117a8b; color: #fff; }
+
+.btn-submit,
+.brand-admin-form .btn-submit,
+.brand-admin-page-title + a.btn-submit,
+.brand-admin-container > p > a.btn-submit {
+    background-color: #3f51b5; /* Indigo */
+    color: white; border-color: #3f51b5;
+}
+.btn-submit:hover,
+.brand-admin-form .btn-submit:hover,
+.brand-admin-page-title + a.btn-submit:hover,
+.brand-admin-container > p > a.btn-submit:hover {
+    background-color: #303f9f; border-color: #303f9f; color: white;
+}
+.brand-admin-filters button {
+    background-color: #607d8b; /* Blue Grey */
+    color: white; border-color: #607d8b;
+}
+.brand-admin-filters button:hover {
+    background-color: #455a64; border-color: #455a64; color: white;
+}
+
+
+/* Status indicators in tables (Products, Orders, etc.) */
+.brand-admin-table .status-active, .brand-admin-table .status-delivered { color: #28a745; font-weight: 500; }
+.brand-admin-table .status-inactive, .brand-admin-table .status-cancelled, .brand-admin-table .status-refunded { color: #dc3545; text-decoration: line-through;}
+.brand-admin-table .status-pending-payment { color: #ffc107; font-weight: 500; }
+.brand-admin-table .status-processing { color: #007bff; font-weight: 500; }
+.brand-admin-table .status-shipped { color: #fd7e14; font-weight: 500; }
+
+
+/* --- Form styling for brand admin --- */
+.brand-admin-form fieldset {
+    border: 1px solid #e0e0e0;
+    padding: 20px;
+    margin-bottom: 25px;
+    border-radius: 6px;
+}
+.brand-admin-form legend {
+    font-weight: 600;
+    color: #333;
+    padding: 0 10px;
+    font-size: 1.1em;
+}
+.brand-admin-form .form-group {
+    margin-bottom: 18px;
+}
+.brand-admin-form .form-group label {
+    display: block;
+    margin-bottom: 7px;
+    font-weight: 500;
+    color: #495057;
+}
+.brand-admin-form .form-group input[type="text"],
+.brand-admin-form .form-group input[type="email"],
+.brand-admin-form .form-group input[type="number"],
+.brand-admin-form .form-group input[type="url"],
+.brand-admin-form .form-group input[type="tel"],
+.brand-admin-form .form-group input[type="password"],
+.brand-admin-form .form-group select,
+.brand-admin-form .form-group textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: 0.95em;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.brand-admin-form .form-group input:focus,
+.brand-admin-form .form-group select:focus,
+.brand-admin-form .form-group textarea:focus {
+    border-color: #3f51b5; /* Indigo focus */
+    outline: 0;
+    box-shadow: 0 0 0 0.15rem rgba(63, 81, 181, 0.2);
+}
+.brand-admin-form .form-group textarea {
+    min-height: 100px;
+}
+.brand-admin-form .form-group input[type="checkbox"] {
+    margin-right: 8px;
+    vertical-align: middle;
+    width: auto;
+}
+.brand-admin-form .form-group small {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.85em;
+    color: #6c757d;
+}
+.brand-admin-form .form-group small a {
+    color: #303f9f;
+}
+
+
+/* --- Brand Admin Messages (Success, Error, Info) --- */
+.brand-admin-message {
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    font-size: 0.95em;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+}
+.brand-admin-message.success {
+    background-color: #d1e7dd; color: #0f5132; border-color: #badbcc;
+}
+.brand-admin-message.error {
+    background-color: #f8d7da; color: #842029; border-color: #f5c2c7;
+}
+.brand-admin-message.info {
+    background-color: #cff4fc; color: #055160; border-color: #b6effb;
+}
+.brand-admin-message.warning {
+    background-color: #fff3cd; color: #664d03; border-color: #ffecb5;
+}
+
+
+/* Utility classes */
+.text-center { text-align: center; }
+.mb-1 { margin-bottom: 0.25rem !important; }
+.mb-2 { margin-bottom: 0.5rem !important; }
+.mb-3 { margin-bottom: 1rem !important; }
+.mt-1 { margin-top: 0.25rem !important; }
+.mt-2 { margin-top: 0.5rem !important; }
+.mt-3 { margin-top: 1rem !important; }
+
+/* Brand Admin Filters */
+.brand-admin-filters {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+.brand-admin-filters form {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+.brand-admin-filters label {
+    font-weight: 500;
+    margin-bottom: 0;
+}
+.brand-admin-filters select, .brand-admin-filters input[type="date"], .brand-admin-filters input[type="text"] {
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    font-size: 0.9em;
+}
+.brand-admin-filters button {
+    padding: 8px 12px;
+}
+
+/* Pagination Styling */
+.pagination {
+    margin-top: 25px;
+    text-align: center;
+    padding-bottom: 10px;
+}
+.pagination a, .pagination span {
+    display: inline-block;
+    padding: 8px 12px;
+    margin: 0 3px;
+    border: 1px solid #dee2e6;
+    color: #3f51b5; /* Indigo */
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+.pagination a:hover {
+    background-color: #e8edf2;
+    color: #303f9f;
+}
+.pagination span.current-page {
+    background-color: #3f51b5;
+    color: white;
+    border-color: #3f51b5;
+    font-weight: bold;
+}
+.pagination span.disabled {
+    color: #6c757d;
+    border-color: #dee2e6;
+    cursor: not-allowed;
+}
+
+
+/* Chart Containers */
+.charts-section .brand-admin-section-title {
+    margin-bottom: 20px;
+}
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+}
+.chart-container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+    height: 350px;
+    position: relative;
+}
+.chart-container h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 1.1em;
+    color: #333;
+    font-weight: 500;
+}
+
+/* For side-by-side sections like recent orders and top products */
+.brand-admin-section-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 25px;
+    margin-top: 30px;
+}
+.brand-admin-section-row > .brand-admin-section {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+}
+.recent-orders-section {
+    flex: 2 1 500px;
+}
+.top-products-section {
+    flex: 1 1 300px;
+}

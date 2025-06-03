@@ -1,8 +1,8 @@
 <?php
 // admin/brands.php - Super Admin Brand Management (List Brands)
 
-$admin_base_url = '.'; // Current directory is admin root for this page
-$main_config_path = dirname(__DIR__) . '/src/config/config.php'; 
+$admin_base_url = '.';
+$main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
@@ -19,13 +19,14 @@ $message = $_SESSION['brand_management_message'] ?? ''; // Display message from 
 unset($_SESSION['brand_management_message']); // Clear message after displaying
 
 // Filters
-$filter_status = $_GET['status'] ?? 'all'; 
+$filter_status = $_GET['status'] ?? 'all';
 
 try {
-    $sql = "SELECT b.brand_id, b.brand_name, b.brand_contact_email, b.is_approved, b.created_at, u.username as admin_username
+    // Select brand_logo_url as well
+    $sql = "SELECT b.brand_id, b.brand_name, b.brand_logo_url, b.brand_contact_email, b.is_approved, b.created_at, u.username as admin_username
             FROM brands b
             LEFT JOIN users u ON b.user_id = u.user_id";
-    
+
     $params = [];
     $conditions = [];
 
@@ -33,13 +34,13 @@ try {
         $conditions[] = "b.is_approved = 0";
     } elseif ($filter_status === 'approved') {
         $conditions[] = "b.is_approved = 1";
-    } 
+    }
 
     if (!empty($conditions)) {
         $sql .= " WHERE " . implode(" AND ", $conditions);
     }
     $sql .= " ORDER BY b.created_at DESC";
-    
+
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $brands = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -77,7 +78,7 @@ try {
     <table class="admin-table">
         <thead>
             <tr>
-                <th>ID</th>
+                <th>Logo</th> <th>ID</th>
                 <th>Brand Name</th>
                 <th>Contact Email</th>
                 <th>Brand Admin</th>
@@ -89,6 +90,20 @@ try {
         <tbody>
             <?php foreach ($brands as $brand): ?>
                 <tr>
+                    <td>
+                        <?php
+                        $logo_display_url = '';
+                        if (!empty($brand['brand_logo_url'])) {
+                            // Assuming PUBLIC_UPLOADS_URL_BASE is defined in config.php
+                            $logo_display_url = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $brand['brand_logo_url']);
+                        } else {
+                            // Placeholder if no logo is set
+                            $logo_display_url = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=Logo');
+                        }
+                        $fallback_logo_url = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=Error');
+                        ?>
+                        <img src="<?php echo $logo_display_url; ?>" alt="<?php echo htmlspecialchars($brand['brand_name']); ?> Logo" style="width: 50px; height: 50px; object-fit: contain; border-radius: 4px; background: #f0f0f0; padding: 2px;" onerror="this.onerror=null; this.src='<?php echo $fallback_logo_url; ?>';">
+                    </td>
                     <td><?php echo htmlspecialchars($brand['brand_id']); ?></td>
                     <td><?php echo htmlspecialchars($brand['brand_name']); ?></td>
                     <td><?php echo htmlspecialchars($brand['brand_contact_email'] ?? 'N/A'); ?></td>
@@ -104,9 +119,9 @@ try {
                     </td>
                     <td><?php echo htmlspecialchars(date("M j, Y", strtotime($brand['created_at']))); ?></td>
                     <td class="actions">
-                        <a href="edit_brand.php?brand_id=<?php echo $brand['brand_id']; ?>" class="btn-edit">View/Edit</a>
+                        <a href="brand_edit.php?brand_id=<?php echo $brand['brand_id']; ?>" class="btn-edit">View/Edit</a>
                         <?php if ($brand['is_approved'] == 0): ?>
-                            <a href="edit_brand.php?brand_id=<?php echo $brand['brand_id']; ?>&action=approve" class="btn-approve" onclick="return confirm('Are you sure you want to approve this brand?');">Approve</a>
+                            <a href="brand_edit.php?brand_id=<?php echo $brand['brand_id']; ?>&action=approve" class="btn-approve" onclick="return confirm('Are you sure you want to approve this brand?');">Approve</a>
                         <?php endif; ?>
                         <?php // Add Suspend/Delete actions later ?>
                     </td>

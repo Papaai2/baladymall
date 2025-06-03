@@ -1,19 +1,24 @@
 <?php
-// admin/edit_product.php - Super Admin: Edit Product
+// brand_admin/edit_product.php - Brand Admin: Edit Product
 
-$admin_base_url = '.';
+$brand_admin_base_url = '.';
 $main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
-    die("CRITICAL ADMIN EDIT PRODUCT ERROR: Main config.php not found.");
+    die("CRITICAL BRAND ADMIN EDIT PRODUCT ERROR: Main config.php not found.");
 }
-require_once 'auth_check.php'; // Ensures user is super_admin
+require_once 'auth_check.php'; // Ensures user is brand_admin and sets $_SESSION['brand_id']
 
-$admin_page_title = "Edit Product";
+$brand_admin_page_title = "Edit Product";
 include_once 'includes/header.php';
 
 $db = getPDOConnection();
+
+// Get the assigned brand ID from the session
+$current_brand_id = $_SESSION['brand_id'];
+$current_brand_name = $_SESSION['brand_name'];
+
 $errors = [];
 $message = '';
 
@@ -21,7 +26,7 @@ $message = '';
 $product_id = filter_input(INPUT_GET, 'product_id', FILTER_VALIDATE_INT);
 
 if (!$product_id) {
-    $_SESSION['admin_message'] = "<div class='admin-message error'>Invalid Product ID.</div>";
+    $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>Invalid Product ID.</div>";
     header("Location: products.php");
     exit;
 }
@@ -30,13 +35,15 @@ if (!$product_id) {
 $product = null;
 $current_category_ids = [];
 try {
-    $stmt_product = $db->prepare("SELECT * FROM products WHERE product_id = :product_id");
+    // Fetch product, ensuring it belongs to the logged-in brand admin's brand
+    $stmt_product = $db->prepare("SELECT * FROM products WHERE product_id = :product_id AND brand_id = :brand_id");
     $stmt_product->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+    $stmt_product->bindParam(':brand_id', $current_brand_id, PDO::PARAM_INT); // Crucial filter
     $stmt_product->execute();
     $product = $stmt_product->fetch(PDO::FETCH_ASSOC);
 
     if (!$product) {
-        $_SESSION['admin_message'] = "<div class='admin-message error'>Product not found (ID: {$product_id}).</div>";
+        $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>Product not found or does not belong to your brand (ID: {$product_id}).</div>";
         header("Location: products.php");
         exit;
     }
@@ -48,15 +55,15 @@ try {
     $current_category_ids = $stmt_prod_cats->fetchAll(PDO::FETCH_COLUMN);
 
 } catch (PDOException $e) {
-    error_log("Admin Edit Product - Error fetching product data: " . $e->getMessage());
-    $_SESSION['admin_message'] = "<div class='admin-message error'>Error loading product data.</div>";
+    error_log("Brand Admin Edit Product - Error fetching product data for brand {$current_brand_id}: " . $e->getMessage());
+    $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>Error loading product data.</div>";
     header("Location: products.php");
     exit;
 }
 
 // Initialize form variables with existing product data
 $product_name_form = $product['product_name'];
-$brand_id_form = $product['brand_id'];
+// brand_id_form is not needed as it's fixed to current_brand_id
 $category_ids_form = $current_category_ids;
 $product_description_form = $product['product_description'];
 $price_form = $product['price'];
@@ -67,23 +74,13 @@ $requires_variants_form = $product['requires_variants'];
 $current_main_image_url = $product['main_image_url'];
 
 
-// --- Fetch Brands for Dropdown ---
-$brands = [];
-try {
-    $stmt_brands = $db->query("SELECT brand_id, brand_name FROM brands WHERE is_approved = 1 ORDER BY brand_name ASC");
-    $brands = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    error_log("Admin Edit Product - Error fetching brands: " . $e->getMessage());
-    $errors['database_fetch'] = "Could not load brands.";
-}
-
 // --- Fetch Categories for Checkboxes/Select ---
 $categories = [];
 try {
     $stmt_categories = $db->query("SELECT category_id, category_name FROM categories ORDER BY category_name ASC");
     $categories = $stmt_categories->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    error_log("Admin Edit Product - Error fetching categories: " . $e->getMessage());
+    error_log("Brand Admin Edit Product - Error fetching categories: " . $e->getMessage());
     $errors['database_fetch'] = "Could not load categories.";
 }
 
@@ -92,7 +89,6 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
     // Sanitize and validate inputs
     $product_name_form = trim(filter_input(INPUT_POST, 'product_name', FILTER_UNSAFE_RAW));
-    $brand_id_form = filter_input(INPUT_POST, 'brand_id', FILTER_VALIDATE_INT);
     $category_ids_form = isset($_POST['category_ids']) ? array_map('intval', $_POST['category_ids']) : [];
     $product_description_form = trim(filter_input(INPUT_POST, 'product_description', FILTER_UNSAFE_RAW));
 
@@ -107,9 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
     $is_active_form = isset($_POST['is_active']) ? 1 : 0;
     $requires_variants_form = isset($_POST['requires_variants']) ? 1 : 0;
 
-    // Basic Validation (similar to add_product.php)
+    // Basic Validation
     if (empty($product_name_form)) $errors['product_name'] = "Product name is required.";
-    if (empty($brand_id_form)) $errors['brand_id'] = "Brand is required.";
     if (empty($category_ids_form)) $errors['category_ids'] = "At least one category is required.";
 
     if ($price_form === null && !$requires_variants_form) {
@@ -124,8 +119,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
         $errors['stock_quantity'] = "Stock quantity must be a valid non-negative number.";
         $stock_quantity_form = $product['stock_quantity']; // Revert to original on error for sticky
     }
-    // If requires_variants, price/stock on main product might be less critical
-    // This logic is simplified for now.
 
     // --- Image Upload Handling (if new image provided) ---
     $main_image_url_db_path_update = $current_main_image_url; // Keep old image if new one not uploaded
@@ -134,7 +127,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
     if (isset($_FILES['main_image']) && $_FILES['main_image']['error'] == UPLOAD_ERR_OK) {
         $image_file = $_FILES['main_image'];
         $upload_dir = PUBLIC_UPLOADS_PATH . 'products/';
-        // Validations (MIME, size) - same as add_product.php
         if (!is_dir($upload_dir)) {
             if (!mkdir($upload_dir, 0775, true)) {
                  $errors['main_image'] = "Failed to create product image upload directory.";
@@ -176,9 +168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
         try {
             $db->beginTransaction();
 
-            // Update products table
+            // Update products table, ensuring brand_id matches the session
             $sql_update_product = "UPDATE products SET
-                                    brand_id = :brand_id,
                                     product_name = :product_name,
                                     product_description = :product_description,
                                     price = :price,
@@ -188,11 +179,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
                                     is_active = :is_active,
                                     requires_variants = :requires_variants,
                                     updated_at = NOW()
-                                   WHERE product_id = :product_id";
+                                   WHERE product_id = :product_id AND brand_id = :brand_id"; // Crucial filter
             $stmt_update_product = $db->prepare($sql_update_product);
 
             $params_update = [
-                ':brand_id' => $brand_id_form,
                 ':product_name' => $product_name_form,
                 ':product_description' => $product_description_form ?: null,
                 ':price' => $requires_variants_form ? null : $price_form,
@@ -201,7 +191,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
                 ':main_image_url' => $main_image_url_db_path_update,
                 ':is_active' => $is_active_form,
                 ':requires_variants' => $requires_variants_form,
-                ':product_id' => $product_id
+                ':product_id' => $product_id,
+                ':brand_id' => $current_brand_id // Ensure update only applies to this brand's product
             ];
             $stmt_update_product->execute($params_update);
 
@@ -248,45 +239,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
 
             $db->commit();
 
-            // Delete old image file if replaced
+            // Delete old image file if replaced and it was a local upload
             if ($old_image_to_delete && file_exists($old_image_to_delete)) {
                 unlink($old_image_to_delete);
             }
 
-            $_SESSION['admin_message'] = "<div class='admin-message success'>Product '" . htmlspecialchars($product_name_form) . "' (ID: {$product_id}) updated successfully.</div>";
-            header("Location: products.php?highlight_product_id=" . $product_id); // Redirect to product list, maybe highlight
+            $_SESSION['brand_admin_message'] = "<div class='brand-admin-message success'>Product '" . htmlspecialchars($product_name_form) . "' (ID: {$product_id}) updated successfully.</div>";
+            header("Location: products.php?highlight_product_id=" . $product_id);
             exit;
 
         } catch (PDOException $e) {
             $db->rollBack();
-            error_log("Admin Edit Product - Error updating product: " . $e->getMessage());
-            // If new image was uploaded but DB failed, delete the newly uploaded image
+            error_log("Brand Admin Edit Product - Error updating product for brand {$current_brand_id}: " . $e->getMessage());
             if ($main_image_url_db_path_update !== $current_main_image_url && $main_image_url_db_path_update && file_exists(PUBLIC_UPLOADS_PATH . $main_image_url_db_path_update)) {
-                // Only delete if it was a local file
-                if (!filter_var($main_image_url_db_path_update, FILTER_VALIDATE_URL)) {
+                // If newly uploaded file exists and was supposed to replace an old one, delete it on DB failure
+                if (!filter_var($main_image_url_db_path_update, FILTER_VALIDATE_URL)) { // Only delete if it was a local file
                     unlink(PUBLIC_UPLOADS_PATH . $main_image_url_db_path_update);
                 }
             }
             $errors['database'] = "An error occurred while updating the product. " . $e->getMessage();
-            $message = "<div class='admin-message error'>An error occurred. Please check details.</div>";
+            $message = "<div class='brand-admin-message error'>An error occurred. Please check details.</div>";
         }
     } else {
-         $message = "<div class='admin-message error'>Please correct the errors below and try again.</div>";
+         $message = "<div class='brand-admin-message error'>Please correct the errors below and try again.</div>";
     }
 }
 
-$admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name']); // Update page title after fetching product
+$brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name']);
 
 ?>
 
-<h1 class="admin-page-title"><?php echo $admin_page_title; ?></h1>
+<h1 class="brand-admin-page-title"><?php echo $brand_admin_page_title; ?></h1>
 <p><a href="products.php">&laquo; Back to Product List</a></p>
 
 <?php if ($message) echo $message; ?>
-<?php if (!empty($errors['database_fetch'])) echo "<div class='admin-message error'>".$errors['database_fetch']."</div>"; ?>
+<?php if (!empty($errors['database_fetch'])) echo "<div class='brand-admin-message error'>".$errors['database_fetch']."</div>"; ?>
 
 
-<form action="edit_product.php?product_id=<?php echo $product_id; ?>" method="POST" class="admin-form" enctype="multipart/form-data" style="max-width: 800px;">
+<form action="edit_product.php?product_id=<?php echo $product_id; ?>" method="POST" class="brand-admin-form" enctype="multipart/form-data" style="max-width: 800px;">
     <fieldset>
         <legend>Basic Information</legend>
         <div class="form-group">
@@ -296,16 +286,9 @@ $admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name']
         </div>
 
         <div class="form-group">
-            <label for="brand_id">Brand <span style="color:red;">*</span></label>
-            <select id="brand_id" name="brand_id" required>
-                <option value="">-- Select Brand --</option>
-                <?php foreach ($brands as $brand): ?>
-                    <option value="<?php echo $brand['brand_id']; ?>" <?php echo ($brand_id_form == $brand['brand_id']) ? 'selected' : ''; ?>>
-                        <?php echo htmlspecialchars($brand['brand_name']); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <?php if (isset($errors['brand_id'])): ?><small style="color:red;"><?php echo $errors['brand_id']; ?></small><?php endif; ?>
+            <label>Brand</label>
+            <input type="text" value="<?php echo htmlspecialchars($current_brand_name); ?>" disabled>
+            <small>This product is associated with your brand: <?php echo htmlspecialchars($current_brand_name); ?></small>
         </div>
 
         <div class="form-group">
@@ -320,7 +303,7 @@ $admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name']
                         </label>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <p>No categories found. Please <a href="categories.php">add categories</a> first.</p>
+                    <p>No categories found. Please contact Super Admin to add categories.</p>
                 <?php endif; ?>
             </div>
             <?php if (isset($errors['category_ids'])): ?><small style="color:red;"><?php echo $errors['category_ids']; ?></small><?php endif; ?>
@@ -410,44 +393,39 @@ $admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name']
 
 <hr style="margin: 30px 0;">
 
-<div id="manage-additional-images" class="admin-section">
-    <h2 class="admin-section-title">Manage Additional Images</h2>
-    <p class="admin-message info">Functionality to upload, reorder, and delete additional product images will be available here soon.</p>
-    </div>
+<div id="manage-additional-images" class="brand-admin-section">
+    <h2 class="brand-admin-section-title">Manage Additional Images</h2>
+    <p class="brand-admin-message info">Functionality to upload, reorder, and delete additional product images will be available here soon.</p>
+</div>
 
-<div id="manage-product-variants" class="admin-section" style="margin-top: 30px;">
-    <h2 class="admin-section-title">Manage Product Variants</h2>
+<div id="manage-product-variants" class="brand-admin-section" style="margin-top: 30px;">
+    <h2 class="brand-admin-section-title">Manage Product Variants</h2>
     <?php if ($requires_variants_form): ?>
-        <p class="admin-message info">Functionality to define attributes (e.g., Size, Color), add variant combinations, set their prices, stock, and images will be available here soon.</p>
+        <p class="brand-admin-message info">Functionality to define attributes (e.g., Size, Color), add variant combinations, set their prices, stock, and images will be available here soon.</p>
         <?php else: ?>
-        <p class="admin-message info">To manage variants, first check the "This Product has Variants" option in the settings above and save the product.</p>
+        <p class="brand-admin-message info">To manage variants, first check the "This Product has Variants" option in the settings above and save the product.</p>
     <?php endif; ?>
 </div>
 
 
 <script>
 function togglePriceStockRequired(requiresVariants) {
-    const priceLabelNotes = document.querySelectorAll('.price-stock-label-note'); // Get all notes
+    const priceLabelNotes = document.querySelectorAll('.price-stock-label-note');
 
     priceLabelNotes.forEach(note => {
         if (requiresVariants) {
             note.innerHTML = '(Optional if variants define price/stock)';
         } else {
-            // Check if this specific field (price or stock) should be mandatory
-            // For simplicity, we're making both notes show '*' if not requiresVariants
             note.innerHTML = '<span style="color:red;">*</span>';
         }
     });
 
-    // Example: if you want to specifically target price input for required attribute
     const priceInput = document.getElementById('price');
     if (priceInput) {
-        // priceInput.required = !requiresVariants; // Uncomment to make price actually required/not
+        // priceInput.required = !requiresVariants;
     }
-    // Add similar for stock_quantity if needed
 }
 
-// Initialize on page load based on checkbox state
 document.addEventListener('DOMContentLoaded', function() {
     const requiresVariantsCheckbox = document.querySelector('input[name="requires_variants"]');
     if (requiresVariantsCheckbox) {

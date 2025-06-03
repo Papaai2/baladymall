@@ -3,37 +3,57 @@
 
 $page_error_message = '';
 $product = null;
-$brand = null;
+// $brand variable is not explicitly used later, product array contains brand_name and brand_id
 $additional_images = [];
 
 // Configuration, Header, and Footer
-$config_path_from_public = __DIR__ . '/../src/config/config.php';
-$header_path_from_public = __DIR__ . '/../src/includes/header.php';
-$footer_path_from_public = __DIR__ . '/../src/includes/footer.php';
+$config_path_from_public = __DIR__ . '/../src/config/config.php'; // Path to config from current file
 
+// Ensure config.php is loaded first
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
-    die("Critical error: Main configuration file not found. Expected at: " . $config_path_from_public);
+    $alt_config_path = dirname(__DIR__) . '/src/config/config.php';
+    if (file_exists($alt_config_path)) {
+        require_once $alt_config_path;
+    } else {
+        die("Critical error: Main configuration file not found. Please check paths.");
+    }
 }
 
+// Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
+$header_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/header.php' : __DIR__ . '/../src/includes/header.php';
+$footer_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/footer.php' : __DIR__ . '/../src/includes/footer.php';
+
 // Get Product ID from URL
-if (!isset($_GET['id']) || !filter_var($_GET['id'], FILTER_VALIDATE_INT)) {
+if (!isset($_GET['id']) || !filter_var($_GET['id'], FILTER_VALIDATE_INT) || (int)$_GET['id'] <= 0) {
     $page_error_message = "Invalid product ID specified.";
-    // Optional: Redirect to products page or 404
-    // header("Location: " . rtrim(SITE_URL, '/') . "/products.php");
-    // exit;
+    // To prevent further execution and potential errors, we can set product to false or handle it before DB connection
+    $product_id = 0; // Invalid ID
 } else {
     $product_id = (int)$_GET['id'];
-    $db = getPDOConnection();
+}
 
+// Initialize $db and check connection
+if (empty($page_error_message)) { // Proceed only if product ID seems valid initially
+    if (!isset($db) || !$db instanceof PDO) {
+        if (function_exists('getPDOConnection')) {
+            $db = getPDOConnection();
+        }
+        if (!isset($db) || !$db instanceof PDO) {
+            $page_error_message = "Database connection is not available. Please try again later.";
+        }
+    }
+}
+
+if (empty($page_error_message) && $product_id > 0 && isset($db) && $db instanceof PDO) {
     try {
         // Fetch main product details
         $stmt_product = $db->prepare("
-            SELECT 
-                p.*, 
-                b.brand_name, 
-                b.brand_id 
+            SELECT
+                p.*,
+                b.brand_name,
+                b.brand_id
             FROM products p
             JOIN brands b ON p.brand_id = b.brand_id
             WHERE p.product_id = :product_id AND p.is_active = 1 AND b.is_approved = 1
@@ -48,9 +68,9 @@ if (!isset($_GET['id']) || !filter_var($_GET['id'], FILTER_VALIDATE_INT)) {
         } else {
             // Fetch additional product images
             $stmt_images = $db->prepare("
-                SELECT image_url, alt_text 
-                FROM product_images 
-                WHERE product_id = :product_id 
+                SELECT image_id, image_url, alt_text
+                FROM product_images
+                WHERE product_id = :product_id
                 ORDER BY sort_order ASC, image_id ASC
             ");
             $stmt_images->bindParam(':product_id', $product_id, PDO::PARAM_INT);
@@ -58,20 +78,23 @@ if (!isset($_GET['id']) || !filter_var($_GET['id'], FILTER_VALIDATE_INT)) {
             $additional_images = $stmt_images->fetchAll(PDO::FETCH_ASSOC);
 
             // Set page title to product name
-            $page_title = htmlspecialchars($product['product_name']) . " - BaladyMall";
+            $page_title = esc_html($product['product_name']) . " - BaladyMall";
         }
 
     } catch (PDOException $e) {
         error_log("Error fetching product details (ID: $product_id): " . $e->getMessage());
         $page_error_message = "Sorry, we couldn't load the product details at this time. Please try again later.";
     }
+} elseif ($product_id === 0 && empty($page_error_message)) { // If ID was invalid from the start
+     $page_error_message = "Invalid product ID specified.";
 }
 
-// Include Header (after $page_title is set)
-if (file_exists($header_path_from_public)) {
-    require_once $header_path_from_public; // Starts session
+
+// Include Header (after $page_title is potentially set)
+if (file_exists($header_path)) {
+    require_once $header_path;
 } else {
-    die("Critical error: Header file not found. Expected at: " . $header_path_from_public);
+    die("Critical error: Header file not found. Expected at: " . htmlspecialchars($header_path));
 }
 
 ?>
@@ -79,8 +102,8 @@ if (file_exists($header_path_from_public)) {
 <section class="product-detail-section">
     <div class="container">
         <?php if (!empty($page_error_message)): ?>
-            <div class="form-message error-message text-center" style="padding: 20px;">
-                <?php echo htmlspecialchars($page_error_message); ?>
+            <div class="form-message error-message text-center" style="padding: 20px; margin: 20px auto; max-width: 600px;">
+                <?php echo esc_html($page_error_message); ?>
                 <p class="mt-3"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary">Back to Products</a></p>
             </div>
         <?php elseif ($product): ?>
@@ -88,56 +111,67 @@ if (file_exists($header_path_from_public)) {
                 <div class="product-gallery animate-on-scroll">
                     <div class="main-image-container">
                         <?php
-                            $main_display_image = !empty($product['main_image_url']) ? $product['main_image_url'] : (isset($additional_images[0]['image_url']) ? $additional_images[0]['image_url'] : '');
-                            if (!empty($main_display_image) && (strpos($main_display_image, 'http://') === 0 || strpos($main_display_image, 'https://') === 0)) {
-                                $main_image_src = htmlspecialchars($main_display_image);
-                            } elseif (!empty($main_display_image)) {
-                                $main_image_src = rtrim(SITE_URL, '/') . '/' . ltrim(htmlspecialchars($main_display_image), '/');
-                            } else {
-                                $main_image_src = "https://placehold.co/600x600/F0F0F0/AAA?text=Product+Image";
+                            // Determine the primary image to display
+                            $main_display_image_path = '';
+                            if (!empty($product['main_image_url'])) {
+                                $main_display_image_path = $product['main_image_url'];
+                            } elseif (isset($additional_images[0]['image_url'])) {
+                                $main_display_image_path = $additional_images[0]['image_url'];
                             }
-                            $fallback_image_src = "https://placehold.co/600x600/F0F0F0/AAA?text=Image+Error";
+
+                            $main_image_src = '';
+                            if (!empty($main_display_image_path)) {
+                                if (strpos($main_display_image_path, 'http://') === 0 || strpos($main_display_image_path, 'https://') === 0) {
+                                    $main_image_src = esc_html($main_display_image_path);
+                                } elseif (defined('PUBLIC_UPLOADS_URL_BASE')) {
+                                    $main_image_src = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim(esc_html($main_display_image_path), '/');
+                                } else { // Fallback if PUBLIC_UPLOADS_URL_BASE not defined but path is relative
+                                    $main_image_src = rtrim(SITE_URL, '/') . '/' . ltrim(esc_html($main_display_image_path), '/');
+                                }
+                            }
+                            if (empty($main_image_src)) {
+                                $main_image_src = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/600x600/F0F0F0/AAA?text=Product+Image" : '#';
+                            }
+                            $fallback_image_src = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/600x600/E0E0E0/777?text=Error" : '#';
                         ?>
-                        <img src="<?php echo $main_image_src; ?>" 
-                             alt="<?php echo htmlspecialchars($product['product_name']); ?>" 
+                        <img src="<?php echo $main_image_src; ?>"
+                             alt="<?php echo esc_html($product['product_name']); ?>"
                              id="mainProductImage"
                              onerror="this.onerror=null;this.src='<?php echo $fallback_image_src; ?>';">
                     </div>
-                    <?php if (!empty($additional_images) || (!empty($product['main_image_url']) && count($additional_images) > 0) ): ?>
+                    <?php
+                        // Prepare all images for the thumbnail gallery, including the main one if set
+                        $gallery_source_images = [];
+                        if (!empty($product['main_image_url'])) {
+                            $gallery_source_images[$product['main_image_url']] = ['image_url' => $product['main_image_url'], 'alt_text' => $product['product_name'] . ' - Main View'];
+                        }
+                        foreach ($additional_images as $img_item) {
+                            if (!empty($img_item['image_url'])) { // Ensure URL is not empty
+                                $gallery_source_images[$img_item['image_url']] = $img_item; // Use URL as key to auto-deduplicate
+                            }
+                        }
+                    ?>
+                    <?php if (count($gallery_source_images) > 1 ): // Show thumbnails only if there's more than one unique image ?>
                         <div class="thumbnail-gallery">
-                            <?php 
-                            // Add main image to thumbnails if it's set and not already in additional images (simple check)
-                            $all_gallery_images = [];
-                            if (!empty($product['main_image_url'])) {
-                                $all_gallery_images[] = ['image_url' => $product['main_image_url'], 'alt_text' => $product['product_name'] . ' - Main View'];
-                            }
-                            foreach ($additional_images as $img) {
-                                // Avoid duplicating main image if it's also in additional_images
-                                if (empty($product['main_image_url']) || $img['image_url'] !== $product['main_image_url']) {
-                                    $all_gallery_images[] = $img;
-                                }
-                            }
-                            // Ensure unique images if main_image_url was also in additional_images
-                            $displayed_urls = [];
-                            ?>
-
-                            <?php foreach ($all_gallery_images as $index => $image_data): ?>
+                            <?php foreach ($gallery_source_images as $image_data): ?>
                                 <?php
-                                    if (in_array($image_data['image_url'], $displayed_urls)) continue; // Skip if already displayed
-                                    $displayed_urls[] = $image_data['image_url'];
-
-                                    $thumb_path = !empty($image_data['image_url']) ? htmlspecialchars($image_data['image_url']) : '';
-                                    if (!empty($thumb_path) && (strpos($thumb_path, 'http://') === 0 || strpos($thumb_path, 'https://') === 0)) {
-                                        $thumb_src = $thumb_path;
-                                    } elseif(!empty($thumb_path)) {
-                                        $thumb_src = rtrim(SITE_URL, '/') . '/' . ltrim($thumb_path, '/');
+                                    $thumb_path = !empty($image_data['image_url']) ? esc_html($image_data['image_url']) : '';
+                                    $thumb_src = '';
+                                    if (!empty($thumb_path)) {
+                                        if (strpos($thumb_path, 'http://') === 0 || strpos($thumb_path, 'https://') === 0) {
+                                            $thumb_src = $thumb_path;
+                                        } elseif (defined('PUBLIC_UPLOADS_URL_BASE')) {
+                                            $thumb_src = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim($thumb_path, '/');
+                                        } else {
+                                            $thumb_src = rtrim(SITE_URL, '/') . '/' . ltrim($thumb_path, '/');
+                                        }
                                     } else {
-                                        continue; // Skip if no valid image path
+                                        continue; // Skip if no valid image path for thumbnail
                                     }
-                                    $thumb_alt = !empty($image_data['alt_text']) ? htmlspecialchars($image_data['alt_text']) : htmlspecialchars($product['product_name']) . ' - View ' . ($index + 1);
+                                    $thumb_alt = !empty($image_data['alt_text']) ? esc_html($image_data['alt_text']) : esc_html($product['product_name']);
                                 ?>
-                                <img src="<?php echo $thumb_src; ?>" 
-                                     alt="<?php echo $thumb_alt; ?>" 
+                                <img src="<?php echo $thumb_src; ?>"
+                                     alt="<?php echo $thumb_alt; ?>"
                                      class="thumbnail-image <?php echo ($thumb_src === $main_image_src) ? 'active' : ''; ?>"
                                      data-large-src="<?php echo $thumb_src; ?>"
                                      onerror="this.style.display='none';">
@@ -147,16 +181,16 @@ if (file_exists($header_path_from_public)) {
                 </div>
 
                 <div class="product-info animate-on-scroll" style="animation-delay: 0.2s;">
-                    <h1 class="product-title"><?php echo htmlspecialchars($product['product_name']); ?></h1>
+                    <h1 class="product-title"><?php echo esc_html($product['product_name']); ?></h1>
                     <p class="product-brand-info">
-                        By: <a href="<?php echo rtrim(SITE_URL, '/'); ?>/brand_detail.php?id=<?php echo htmlspecialchars($product['brand_id']); ?>"><?php echo htmlspecialchars($product['brand_name']); ?></a>
+                        By: <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php?brand_id=<?php echo esc_html($product['brand_id']); ?>"><?php echo esc_html($product['brand_name']); ?></a>
                     </p>
-                    
+
                     <div class="price-section">
-                        <span class="current-price"><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($product['price'], 2)); ?></span>
-                        <?php if (isset($product['compare_at_price']) && $product['compare_at_price'] > $product['price']): ?>
-                            <span class="original-price"><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($product['compare_at_price'], 2)); ?></span>
-                            <?php 
+                        <span class="current-price"><?php echo CURRENCY_SYMBOL . esc_html(number_format($product['price'], 2)); ?></span>
+                        <?php if (isset($product['compare_at_price']) && $product['compare_at_price'] > 0 && $product['compare_at_price'] > $product['price']): ?>
+                            <span class="original-price"><?php echo CURRENCY_SYMBOL . esc_html(number_format($product['compare_at_price'], 2)); ?></span>
+                            <?php
                                 $discount_percentage = (($product['compare_at_price'] - $product['price']) / $product['compare_at_price']) * 100;
                             ?>
                             <span class="discount-badge"><?php echo round($discount_percentage); ?>% OFF</span>
@@ -169,17 +203,20 @@ if (file_exists($header_path_from_public)) {
                             {/* TODO: Implement variant selection (dropdowns, swatches) */}
                         </div>
                     <?php endif; ?>
-                    
+
                     <div class="product-actions-detail">
-                        <?php if ($product['requires_variants'] == 0 && (!isset($product['stock_quantity']) || $product['stock_quantity'] > 0) ): ?>
-                            {/* Simple product add to cart */}
-                            <form action="<?php echo rtrim(SITE_URL, '/'); ?>/cart.php" method="POST" class="add-to-cart-form">
+                        <?php
+                        $effective_stock = $product['requires_variants'] == 0 ? (int)($product['stock_quantity'] ?? 0) : 9999; // Assume variants have stock for now
+                        $is_in_stock = $product['requires_variants'] == 1 || ($product['requires_variants'] == 0 && $effective_stock > 0);
+                        ?>
+                        <?php if ($is_in_stock && $product['requires_variants'] == 0): ?>
+                            <form action="<?php echo rtrim(SITE_URL, '/'); ?>/cart.php" method="POST" class="add-to-cart-form ajax-add-to-cart-form">
                                 <input type="hidden" name="action" value="add">
-                                <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($product['product_id']); ?>">
+                                <input type="hidden" name="product_id" value="<?php echo esc_html($product['product_id']); ?>">
                                 <div class="quantity-selector form-group" style="max-width: 150px; margin-bottom:15px;">
-                                    <label for="quantity">Quantity:</label>
-                                    <input type="number" id="quantity" name="quantity" value="1" min="1" 
-                                           max="<?php echo isset($product['stock_quantity']) ? htmlspecialchars($product['stock_quantity']) : '99'; ?>" 
+                                    <label for="quantity" class="form-label">Quantity:</label>
+                                    <input type="number" id="quantity" name="quantity" value="1" min="1"
+                                           max="<?php echo esc_html($effective_stock); ?>"
                                            class="form-control form-control-sm">
                                 </div>
                                 <button type="submit" class="btn btn-primary btn-lg btn-add-to-cart-detail">
@@ -193,38 +230,55 @@ if (file_exists($header_path_from_public)) {
                              <button type="button" class="btn btn-primary btn-lg btn-add-to-cart-detail disabled" disabled title="Select options to add to cart">
                                 Add to Cart (Select Options)
                             </button>
-                        <?php else: ?>
-                            <p class="out-of-stock-message error-message">Currently Out of Stock</p>
+                        <?php else: // Not variant and out of stock ?>
+                            <p class="out-of-stock-message error-message"> Currently Out of Stock</p>
                         <?php endif; ?>
-                    </div>
-                    
-                    <div class="product-description">
-                        <h3>Product Description</h3>
-                        <?php echo !empty($product['product_description']) ? nl2br(htmlspecialchars($product['product_description'])) : '<p>No description available for this product.</p>'; ?>
                     </div>
 
-                    {/* Placeholder for other details like SKU, categories, tags, shipping info */}
+                    <div class="product-description">
+                        <h3>Product Description</h3>
+                        <?php echo !empty($product['product_description']) ? nl2br(esc_html($product['product_description'])) : '<p>No description available for this product.</p>'; ?>
+                    </div>
+
                     <div class="additional-details mt-4">
                         <?php if(isset($product['sku']) && !empty($product['sku'])): ?>
-                            <p><small>SKU: <?php echo htmlspecialchars($product['sku']); ?></small></p>
+                            <p><small>SKU: <?php echo esc_html($product['sku']); ?></small></p>
                         <?php endif; ?>
-                        {/* TODO: Display categories, tags if available */}
+                        <?php
+                        // TODO: Display categories if fetched
+                        // Example: Fetch and display categories
+                        // $stmt_cats = $db->prepare("SELECT c.category_id, c.category_name FROM categories c JOIN product_category pc ON c.category_id = pc.category_id WHERE pc.product_id = :product_id");
+                        // $stmt_cats->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+                        // $stmt_cats->execute();
+                        // $product_categories = $stmt_cats->fetchAll(PDO::FETCH_ASSOC);
+                        // if($product_categories) {
+                        //    echo "<p><small>Categories: ";
+                        //    $cat_links = [];
+                        //    foreach($product_categories as $cat) {
+                        //        $cat_links[] = "<a href='" . rtrim(SITE_URL, '/') . "/products.php?category_id=" . esc_html($cat['category_id']) . "'>" . esc_html($cat['category_name']) . "</a>";
+                        //    }
+                        //    echo implode(', ', $cat_links);
+                        //    echo "</small></p>";
+                        // }
+                        ?>
                     </div>
                 </div>
             </div>
 
-            {/* TODO: Related Products Section */}
-            {/* <section class="related-products-section mt-5"> ... </section> */}
+            <?php
+            // TODO: Related Products Section (fetch and display similar products)
+            // <section class="related-products-section mt-5"><h2>You Might Also Like</h2><div class="product-grid">...</div></section>
+            ?>
 
         <?php endif; ?>
     </div>
 </section>
 
 <?php
-if (file_exists($footer_path_from_public)) {
-    require_once $footer_path_from_public;
+if (file_exists($footer_path)) {
+    require_once $footer_path;
 } else {
-    die("Critical error: Footer file not found. Expected at: " . $footer_path_from_public);
+    die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path));
 }
 ?>
 
@@ -237,20 +291,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mainImage && thumbnails.length > 0) {
         thumbnails.forEach(thumb => {
             thumb.addEventListener('click', function() {
-                mainImage.src = this.dataset.largeSrc; // Use data-large-src for the full image
-                mainImage.alt = this.alt;
-
-                // Update active state for thumbnails
+                if (mainImage.src !== this.dataset.largeSrc) { // Only change if different
+                    mainImage.src = this.dataset.largeSrc;
+                    mainImage.alt = this.alt; // Update alt text too
+                }
                 thumbnails.forEach(t => t.classList.remove('active'));
                 this.classList.add('active');
             });
-            // Add hover effect to change main image (optional)
-            /*
-            thumb.addEventListener('mouseover', function() {
-                mainImage.src = this.dataset.largeSrc;
-                mainImage.alt = this.alt;
-            });
-            */
         });
     }
 });
