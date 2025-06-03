@@ -71,6 +71,9 @@ if (isset($_SESSION['first_name']) && !empty(trim($_SESSION['first_name']))) {
     $admin_display_name = htmlspecialchars($_SESSION['username']);
 }
 
+// Determine active page for navigation styling
+$current_page_script = basename($_SERVER['PHP_SELF']);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -92,11 +95,11 @@ if (isset($_SESSION['first_name']) && !empty(trim($_SESSION['first_name']))) {
                 <nav class="admin-main-nav">
                     <ul>
                         <li>Welcome, <?php echo $admin_display_name; ?>!</li>
-                        <li><a href="<?php echo ADMIN_BASE_URL_FOR_LINKS; ?>/index.php">Dashboard</a></li>
-                        <li><a href="<?php echo ADMIN_BASE_URL_FOR_LINKS; ?>/brands.php">Brands</a></li>
+                        <li><a href="<?php echo ADMIN_BASE_URL_FOR_LINKS; ?>/index.php" class="<?php echo ($current_page_script === 'index.php') ? 'active' : ''; ?>">Dashboard</a></li>
+                        <li><a href="<?php echo ADMIN_BASE_URL_FOR_LINKS; ?>/brands.php" class="<?php echo ($current_page_script === 'brands.php' || $current_page_script === 'edit_brand.php') ? 'active' : ''; ?>">Brands</a></li>
                         <li><a href="#">Products</a></li> <?php // Placeholder ?>
                         <li><a href="#">Orders</a></li> <?php // Placeholder ?>
-                        <li><a href="<?php echo ADMIN_BASE_URL_FOR_LINKS; ?>/users.php">Users</a></li>
+                        <li><a href="<?php echo ADMIN_BASE_URL_FOR_LINKS; ?>/users.php" class="<?php echo ($current_page_script === 'users.php' || $current_page_script === 'edit_user.php') ? 'active' : ''; ?>">Users</a></li>
                         <li><a href="#">Settings</a></li> <?php // Placeholder ?>
                         <li><a href="<?php echo rtrim(SITE_URL, '/') . '/logout.php?admin_logout=true'; ?>" class="logout-link">Logout</a></li>
                     </ul>

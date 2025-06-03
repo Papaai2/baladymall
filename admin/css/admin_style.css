@@ -2,11 +2,21 @@
 body, html {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #f0f2f5; /* Light grey background for admin area */
-    color: #333;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; /* Consistent font */
+    background-color: #f0f2f5; /* Light grey background for admin area - Kept from previous for content backdrop */
+    color: #343a40; 
     line-height: 1.6;
     font-size: 15px;
+}
+
+a {
+    color: #007bff; /* Standard link color for content areas */
+    text-decoration: none;
+    transition: color 0.2s ease-in-out;
+}
+a:hover {
+    color: #0056b3;
+    text-decoration: underline;
 }
 
 .admin-wrapper {
@@ -15,11 +25,13 @@ body, html {
     min-height: 100vh;
 }
 
+/* --- Admin Header (Reverted to Darker Theme) --- */
 .admin-header {
-    background-color: #2c3e50; /* Dark blue/grey */
-    color: #ecf0f1; /* Light text */
-    padding: 0 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background-color: #2c3e50; /* Dark blue/grey - Reverted */
+    color: #ecf0f1; /* Light text - Reverted */
+    padding: 0 25px;
+    border-bottom: 1px solid #34495e; /* Darker border */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Kept subtle shadow */
     position: sticky;
     top: 0;
     z-index: 1000;
@@ -31,14 +43,14 @@ body, html {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 60px;
+    height: 65px; 
 }
 
 .admin-logo a {
-    color: #ecf0f1;
+    color: #ecf0f1; /* Light logo text - Reverted */
     text-decoration: none;
-    font-size: 1.4em;
-    font-weight: 600;
+    font-size: 1.5em; 
+    font-weight: 700; 
 }
 
 .admin-main-nav ul {
@@ -50,107 +62,123 @@ body, html {
 }
 
 .admin-main-nav li {
-    margin-left: 20px;
+    margin-left: 18px; 
     font-size: 0.95em;
 }
+.admin-main-nav li:first-child { /* Welcome message */
+    color: #bdc3c7; /* Lighter grey for welcome text - Reverted */
+    font-weight: 500;
+    padding-right: 10px;
+}
+
 
 .admin-main-nav a {
-    color: #bdc3c7; /* Lighter grey for links */
+    color: #bdc3c7; /* Lighter grey for links - Reverted */
     text-decoration: none;
-    padding: 8px 10px;
-    border-radius: 4px;
+    padding: 10px 12px; 
+    border-radius: 5px;
+    font-weight: 500;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .admin-main-nav a:hover,
-.admin-main-nav a.active { /* Add 'active' class to current page link */
-    color: #ffffff;
-    background-color: #34495e; /* Slightly lighter dark blue */
+.admin-main-nav a.active { 
+    color: #ffffff; /* White for active/hover link text - Reverted */
+    background-color: #34495e; /* Slightly lighter dark blue for active/hover bg - Reverted */
+    text-decoration: none;
+}
+.admin-main-nav .logout-link {
+    color: #e74c3c; /* Brighter red for logout on dark bg */
+    font-weight: 500;
 }
 .admin-main-nav .logout-link:hover {
-    background-color: #c0392b; /* Red for logout hover */
+    background-color: #c0392b; 
+    color: #fff;
 }
 
 
+/* --- Admin Main Content (Keeping lighter background for content readability) --- */
 .admin-main {
     flex-grow: 1;
-    padding: 25px;
+    padding: 30px; 
 }
 
 .admin-container {
-    background-color: #ffffff;
-    padding: 20px 25px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-    max-width: 100%; /* Default, can be overridden by specific page containers */
+    background-color: #ffffff; /* White background for content boxes */
+    padding: 25px 30px; 
+    border-radius: 10px; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+    max-width: 100%; 
 }
 
 .admin-footer {
     text-align: center;
-    padding: 15px;
-    background-color: #e9ecef; /* Light background for footer */
+    padding: 20px; 
+    background-color: #e9ecef; /* Lighter footer background */
     border-top: 1px solid #dee2e6;
     font-size: 0.9em;
     color: #6c757d;
 }
 
-/* Basic Admin Page Title */
+/* Page Title */
 .admin-page-title {
-    font-size: 1.8em;
-    color: #333;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
+    font-size: 2em; 
+    color: #343a40; /* Dark title text */
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef; 
+    font-weight: 600;
 }
 
-/* Stat Cards for Dashboard */
+/* --- Stat Cards for Dashboard (Keeping modern look) --- */
 .stat-cards-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 20px;
-    margin-bottom: 30px;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+    gap: 25px;
+    margin-bottom: 35px;
 }
 
 .stat-card {
     background-color: #fff;
-    padding: 20px;
+    padding: 25px;
     border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-    border-left: 5px solid; /* Color will be set per card type */
+    box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+    border-left: 5px solid; 
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.1);
 }
 
-.stat-card.total-sales { border-left-color: #28a745; } /* Green */
-.stat-card.total-orders { border-left-color: #007bff; } /* Blue */
-.stat-card.total-users { border-left-color: #ffc107; } /* Yellow */
-.stat-card.pending-brands { border-left-color: #fd7e14; } /* Orange */
+.stat-card.total-sales { border-left-color: #28a745; } 
+.stat-card.total-orders { border-left-color: #007bff; } 
+.stat-card.total-users { border-left-color: #ffc107; } 
+.stat-card.pending-brands { border-left-color: #fd7e14; } 
 
 .stat-card h3 {
     margin-top: 0;
-    font-size: 1.1em;
-    color: #6c757d; /* Muted color for title */
-    margin-bottom: 5px;
+    font-size: 1.05em; 
+    color: #6c757d; 
+    margin-bottom: 8px; 
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-weight: 500;
 }
 
 .stat-card .stat-value {
-    font-size: 2.2em;
-    font-weight: 600;
+    font-size: 2.4em; 
+    font-weight: 700; 
     color: #343a40;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .stat-card .stat-description {
-    font-size: 0.9em;
+    font-size: 0.95em; 
     color: #6c757d;
 }
 .stat-card .stat-link a {
-    font-size: 0.9em;
+    font-size: 0.95em;
     color: #007bff;
     text-decoration: none;
     font-weight: 500;
@@ -160,107 +188,201 @@ body, html {
 }
 
 
-/* Basic Table Styling for Admin */
+/* --- Admin Table Styling (Keeping modern look) --- */
 .admin-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
+    margin-top: 25px;
     font-size: 0.95em;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-radius: 8px; 
+    overflow: hidden; 
 }
 .admin-table th,
 .admin-table td {
-    border: 1px solid #dee2e6;
-    padding: 10px 12px;
+    border-bottom: 1px solid #dee2e6; 
+    padding: 12px 15px; 
     text-align: left;
     vertical-align: middle;
 }
+.admin-table td:first-child, .admin-table th:first-child {
+    padding-left: 20px;
+}
+.admin-table td:last-child, .admin-table th:last-child {
+    padding-right: 20px;
+}
+
 .admin-table thead th {
-    background-color: #f1f3f5; /* Slightly darker than container bg */
-    font-weight: 600;
+    background-color: #f8f9fa; 
+    font-weight: 600; 
     color: #495057;
+    text-transform: uppercase;
+    font-size: 0.85em; 
+    letter-spacing: 0.5px;
+    border-bottom-width: 2px; 
 }
 .admin-table tbody tr:nth-child(even) {
-    background-color: #f8f9fa; /* Alternating row color */
+    background-color: #fdfdfd; 
 }
 .admin-table tbody tr:hover {
-    background-color: #e9ecef; /* Hover effect */
+    background-color: #f1f3f7; 
 }
 .admin-table .actions a, .admin-table .actions button {
     margin-right: 8px;
-    padding: 5px 8px;
-    font-size: 0.9em;
+    padding: 6px 10px; 
+    font-size: 0.85em; 
     text-decoration: none;
     border-radius: 4px;
     cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
 }
-.admin-table .actions .btn-edit {
-    color: #fff; background-color: #ffc107; border: 1px solid #ffc107;
+.admin-table .actions a:last-child, .admin-table .actions button:last-child {
+    margin-right: 0;
 }
-.admin-table .actions .btn-approve {
-    color: #fff; background-color: #28a745; border: 1px solid #28a745;
+
+/* Consistent Button Styles (similar to public site .btn) */
+.admin-table .actions .btn-edit,
+.admin-table .actions .btn-approve,
+.admin-table .actions .btn-suspend,
+.admin-table .actions .btn-view,
+.admin-form .btn-submit, 
+.admin-filters button, 
+.admin-page-title + a.btn-submit 
+ {
+    display: inline-block;
+    font-weight: 500;
+    text-align: center;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    border-radius: 0.25rem;
+    transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
-.admin-table .actions .btn-suspend {
-    color: #fff; background-color: #dc3545; border: 1px solid #dc3545;
-}
-.admin-table .actions .btn-view {
-    color: #fff; background-color: #17a2b8; border: 1px solid #17a2b8;
+.admin-table .actions .btn-edit:hover,
+.admin-table .actions .btn-approve:hover,
+.admin-table .actions .btn-suspend:hover,
+.admin-table .actions .btn-view:hover,
+.admin-form .btn-submit:hover,
+.admin-filters button:hover,
+.admin-page-title + a.btn-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 
-/* Form styling for admin */
+.admin-table .actions .btn-edit { color: #212529; background-color: #ffc107; border-color: #ffc107; }
+.admin-table .actions .btn-edit:hover { background-color: #e0a800; border-color: #d39e00; }
+
+.admin-table .actions .btn-approve { color: #fff; background-color: #28a745; border-color: #28a745; }
+.admin-table .actions .btn-approve:hover { background-color: #218838; border-color: #1e7e34; }
+
+.admin-table .actions .btn-suspend { color: #fff; background-color: #dc3545; border-color: #dc3545; }
+.admin-table .actions .btn-suspend:hover { background-color: #c82333; border-color: #bd2130; }
+
+.admin-table .actions .btn-view { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
+.admin-table .actions .btn-view:hover { background-color: #138496; border-color: #117a8b; }
+
+.admin-form .btn-submit,
+.admin-page-title + a.btn-submit { 
+    background-color: #007bff; color: white; border-color: #007bff;
+}
+.admin-form .btn-submit:hover,
+.admin-page-title + a.btn-submit:hover {
+    background-color: #0056b3; border-color: #0056b3;
+}
+.admin-filters button {
+    background-color: #6c757d; color: white; border-color: #6c757d;
+}
+.admin-filters button:hover {
+    background-color: #5a6268; border-color: #545b62;
+}
+
+
+/* Status indicators in tables */
+.admin-table .status-processing { color: #007bff; font-weight: 500; }
+.admin-table .status-shipped { color: #fd7e14; font-weight: 500; } 
+.admin-table .status-delivered { color: #28a745; font-weight: 500; }
+.admin-table .status-pending-payment { color: #ffc107; font-weight: 500; } 
+.admin-table .status-cancelled, .admin-table .status-refunded { color: #dc3545; text-decoration: line-through;}
+
+
+/* --- Form styling for admin (Keeping modern look) --- */
 .admin-form .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 20px; 
 }
 .admin-form .form-group label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px; 
     font-weight: 500;
+    color: #495057; 
 }
 .admin-form .form-group input[type="text"],
 .admin-form .form-group input[type="email"],
 .admin-form .form-group input[type="number"],
+.admin-form .form-group input[type="url"],
+.admin-form .form-group input[type="tel"],
 .admin-form .form-group select,
 .admin-form .form-group textarea {
     width: 100%;
-    padding: 8px 10px;
+    padding: 10px 12px; 
     border: 1px solid #ced4da;
-    border-radius: 4px;
+    border-radius: 5px; 
     font-size: 0.95em;
-    box-sizing: border-box; /* Ensure padding doesn't add to width */
+    box-sizing: border-box; 
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.admin-form .form-group input:focus,
+.admin-form .form-group select:focus,
+.admin-form .form-group textarea:focus {
+    border-color: #007bff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.2); 
 }
 .admin-form .form-group textarea {
-    min-height: 80px;
+    min-height: 100px; 
 }
-.admin-form .btn-submit {
-    background-color: #007bff;
-    color: white;
-    padding: 10px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1em;
+.admin-form .form-group input[type="checkbox"] {
+    margin-right: 8px;
+    vertical-align: middle;
 }
-.admin-form .btn-submit:hover {
-    background-color: #0056b3;
+.admin-form .form-group small { 
+    display: block;
+    margin-top: 6px;
+    font-size: 0.85em;
+    color: #6c757d;
+}
+.admin-form .form-group small a {
+    color: #0056b3;
 }
 
-/* Messages */
+
+/* --- Admin Messages (Success, Error, Info) (Keeping modern look) --- */
 .admin-message {
-    padding: 10px 15px;
-    margin-bottom: 15px;
-    border-radius: 4px;
+    padding: 12px 18px; 
+    margin-bottom: 20px; 
+    border-radius: 6px;
     font-size: 0.95em;
+    border: 1px solid transparent;
+    display: flex; 
+    align-items: center;
 }
 .admin-message.success {
-    background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;
+    background-color: #d1e7dd; color: #0f5132; border-color: #badbcc;
 }
 .admin-message.error {
-    background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;
+    background-color: #f8d7da; color: #842029; border-color: #f5c2c7;
 }
 .admin-message.info {
-    background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;
+    background-color: #cff4fc; color: #055160; border-color: #b6effb; 
 }
+.admin-message.warning {
+    background-color: #fff3cd; color: #664d03; border-color: #ffecb5; 
+}
+
 
 /* Utility classes */
 .text-center { text-align: center; }
@@ -271,9 +393,31 @@ body, html {
 .mt-2 { margin-top: 0.5rem !important; }
 .mt-3 { margin-top: 1rem !important; }
 
-/* In admin/css/admin_style.css */
-.admin-table .status-processing { color: #007bff; font-weight: bold; }
-.admin-table .status-shipped { color: #ffc107; font-weight: bold; }
-.admin-table .status-delivered { color: #28a745; font-weight: bold; }
-.admin-table .status-pending-payment { color: #fd7e14; font-weight: bold; }
-.admin-table .status-cancelled { color: #dc3545; text-decoration: line-through;}
+/* Admin Filters (e.g., on brands.php) */
+.admin-filters {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+.admin-filters form {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+.admin-filters label {
+    font-weight: 500;
+    margin-bottom: 0; 
+}
+.admin-filters select {
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    font-size: 0.9em;
+}
+.admin-filters button { 
+    padding: 8px 12px;
+}
+
