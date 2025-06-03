@@ -1,40 +1,41 @@
 <?php
 // src/includes/header.php
 
-// It's crucial to include config.php first to have access to constants and functions
-// We need to adjust the path relative to header.php's location in src/includes/
-if (file_exists(dirname(__DIR__) . '/config/config.php')) {
-    require_once dirname(__DIR__) . '/config/config.php';
-} else {
-    // Fallback for cases where the path might be different or if called from a different context
-    // This is less ideal and assumes a known root structure if the direct relative path fails.
-    // For robust applications, a single entry point (like index.php in public) setting up paths is better.
-    if (defined('SRC_PATH') && file_exists(SRC_PATH . '/config/config.php')) {
-         require_once SRC_PATH . '/config/config.php';
+// Ensure config.php (which defines SESSION_NAME and SITE_URL) is loaded.
+// All your public/*.php files should require_once config.php before this header.
+if (!defined('SESSION_NAME') || !defined('SITE_URL')) {
+    $config_path_from_header = dirname(__DIR__) . '/config/config.php';
+    if (file_exists($config_path_from_header)) {
+        require_once $config_path_from_header;
     } else {
-        die("Configuration file not found. Please check the path in header.php.");
+        die("CRITICAL ERROR: config.php not found or key constants (SESSION_NAME, SITE_URL) are not defined.");
     }
 }
 
-
-// Start the session if it hasn't been started already.
-// It's good practice to check if headers have already been sent.
-if (session_status() == PHP_SESSION_NONE && !headers_sent()) {
-    // Set session parameters for security before starting
-    // session_set_cookie_params([
-    //     'lifetime' => 0, // 0 = until browser closes
-    //     'path' => '/',
-    //     'domain' => '', // Set your domain in production
-    //     'secure' => isset($_SERVER['HTTPS']), // True if on HTTPS
-    //     'httponly' => true, // Prevent JavaScript access to session cookie
-    //     'samesite' => 'Lax' // Lax or Strict
-    // ]);
-    session_name(SESSION_NAME); // Use the session name from config
-    session_start();
+// Start the session if it hasn't been started already and headers haven't been sent.
+if (session_status() == PHP_SESSION_NONE) {
+    if (headers_sent($file, $line)) {
+        error_log("HEADER.PHP: Session not started because headers already sent in $file on line $line.");
+        // Optionally, display an error or die if session is critical and cannot start.
+        // die("Error: Cannot start session, headers already sent.");
+    } else {
+        if (defined('SESSION_NAME')) {
+            session_name(SESSION_NAME);
+        }
+        // Recommended session cookie parameters for production:
+        /*
+        session_set_cookie_params([
+            'lifetime' => 0, 
+            'path' => '/',
+            'domain' => '', // Set your domain in production, e.g., '.baladymall.com'
+            'secure' => isset($_SERVER['HTTPS']), 
+            'httponly' => true,
+            'samesite' => 'Lax' 
+        ]);
+        */
+        session_start();
+    }
 }
-
-// Attempt to connect to the database (optional here, but can be useful for user status in header)
-// $db = getPDOConnection(); // You might use this to check login status, display username, etc.
 
 ?>
 <!DOCTYPE html>
@@ -42,52 +43,64 @@ if (session_status() == PHP_SESSION_NONE && !headers_sent()) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo defined('SITE_NAME') ? htmlspecialchars(SITE_NAME) : 'BaladyMall'; ?> - <?php echo isset($page_title) ? htmlspecialchars($page_title) : 'Welcome'; ?></title>
+    <title><?php echo htmlspecialchars(SITE_NAME); ?> - <?php echo isset($page_title) ? htmlspecialchars($page_title) : 'Welcome'; ?></title>
     
-    <link rel="stylesheet" href="<?php echo defined('SITE_URL') ? SITE_URL : ''; ?>/css/style.css?v=<?php echo time(); // Cache busting for development ?>">
+    <link rel="stylesheet" href="<?php echo rtrim(SITE_URL, '/'); ?>/css/style.css?v=<?php echo time(); // Cache-busting for development ?>">
     
-    </head>
+</head>
 <body>
 
     <header class="site-header">
         <div class="container">
-            <div class="logo-container">
-                <a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>" class="site-logo">
-                    <h1><?php echo defined('SITE_NAME') ? htmlspecialchars(SITE_NAME) : 'BaladyMall'; ?></h1>
+            <div class="site-logo"> 
+                <a href="<?php echo rtrim(SITE_URL, '/'); ?>/index.php">
+                    <h1><?php echo htmlspecialchars(SITE_NAME); ?></h1>
                 </a>
             </div>
 
             <nav class="main-navigation">
                 <ul>
-                    <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/index.php">Home</a></li>
-                    <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/products.php">All Products</a></li>
-                    <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/categories.php">Categories</a></li>
-                    <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/brands.php">Brands</a></li>
-                    <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/about.php">About Us</a></li>
-                    <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/contact.php">Contact</a></li>
+                    <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/index.php">Home</a></li>
+                    <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php">All Products</a></li>
+                    <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/categories.php">Categories</a></li>
+                    <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/brands.php">Brands</a></li>
+                    <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/about.php">About Us</a></li>
+                    <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/contact.php">Contact</a></li>
                 </ul>
             </nav>
 
             <div class="header-actions">
                 <ul>
-                    <?php if (isset($_SESSION['user_id'])): ?>
-                        <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/my_account.php">My Account</a></li>
-                        <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/logout.php">Logout</a></li>
+                    <?php if (isset($_SESSION['user_id'])): // Correct session variable check ?>
+                        <?php 
+                            // Determine the display name; default to 'User' if first_name isn't set
+                            $display_name = isset($_SESSION['first_name']) && !empty(trim($_SESSION['first_name'])) 
+                                            ? htmlspecialchars($_SESSION['first_name']) 
+                                            : (isset($_SESSION['username']) ? htmlspecialchars($_SESSION['username']) : 'User');
+                        ?>
+                        <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php">My Account (<?php echo $display_name; ?>)</a></li>
+                        <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/logout.php">Logout</a></li>
                     <?php else: ?>
-                        <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/login.php">Login</a></li>
-                        <li><a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/register.php">Register</a></li>
+                        <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/login.php">Login</a></li>
+                        <li><a href="<?php echo rtrim(SITE_URL, '/'); ?>/register.php">Register</a></li>
                     <?php endif; ?>
                     <li>
-                        <a href="<?php echo defined('SITE_URL') ? SITE_URL : '/'; ?>/cart.php">
+                        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/cart.php">
                             Cart 
                             <span class="cart-count">
                                 <?php 
-                                // Basic cart count example - you'll implement this properly later
-                                if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
-                                    echo count($_SESSION['cart']);
-                                } else {
-                                    echo 0;
+                                // Updated cart count logic
+                                $cart_display_count = 0;
+                                if (isset($_SESSION['header_cart_item_count']) && is_numeric($_SESSION['header_cart_item_count'])) {
+                                    // Use the count set by cart.php (total quantity of items)
+                                    $cart_display_count = $_SESSION['header_cart_item_count'];
+                                } elseif (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
+                                    // Fallback: if cart.php hasn't set the specific count,
+                                    // sum the quantities of items in the cart.
+                                    // This assumes $_SESSION['cart'] is [product_id => quantity]
+                                    $cart_display_count = array_sum($_SESSION['cart']);
                                 }
+                                echo $cart_display_count;
                                 ?>
                             </span>
                         </a>
@@ -99,3 +112,4 @@ if (session_status() == PHP_SESSION_NONE && !headers_sent()) {
 
     <main class="site-main">
         <div class="container"> 
+            

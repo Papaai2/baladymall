@@ -1,19 +1,11 @@
 <?php
 // public/index.php
 
-// Define a page-specific title
 $page_title = "Welcome to BaladyMall - Your Home for Local Egyptian Brands";
-
-// Include the header.php.
-// The path needs to be relative to index.php's location in the public/ folder.
-// We are going up one level from public/ to the project root, then into src/includes/
-// A more robust way, if config.php (which defines ROOT_PATH/SRC_PATH) is included first,
-// would be to use those constants. Let's try to include config.php directly first.
 
 $config_path_from_public = __DIR__ . '/../src/config/config.php';
 $header_path_from_public = __DIR__ . '/../src/includes/header.php';
 $footer_path_from_public = __DIR__ . '/../src/includes/footer.php';
-
 
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
@@ -21,34 +13,40 @@ if (file_exists($config_path_from_public)) {
     die("Critical error: Main configuration file not found from public/index.php. Expected at: " . $config_path_from_public);
 }
 
-// Now that config.php is loaded, SITE_URL and other constants should be available.
-// The header.php also tries to include config.php, which is fine; require_once handles it.
 if (file_exists($header_path_from_public)) {
     require_once $header_path_from_public;
 } else {
     die("Critical error: Header file not found. Expected at: " . $header_path_from_public);
 }
 
-// At this point, $db = getPDOConnection(); from config.php can be used if needed.
-// For example, to fetch featured products or brands for the homepage.
 $db = getPDOConnection();
+
+// Check for global messages passed via GET (e.g., after login)
+// These divs will be picked up by the showCustomMessage function in script.js
+if (isset($_GET['login']) && $_GET['login'] === 'success') {
+    echo "<div id='phpGlobalSuccessMessage' style='display:none;'>You have successfully logged in. Welcome back!</div>";
+}
+// You can add other global messages here if needed, e.g., for errors from other processes.
+// if (isset($_GET['error_code'])) {
+//     echo "<div id='phpGlobalErrorMessage' style='display:none;'>An error occurred: " . htmlspecialchars($_GET['error_code']) . "</div>";
+// }
 
 ?>
 
 <section class="hero-section">
     <div class="hero-content">
-        <h1>Discover Authentic Egyptian Brands</h1>
+        <h1 data-typing-text="Discover Authentic Egyptian Brands">Discover Authentic Egyptian Brands</h1>
         <p>Shop unique products from local artisans and businesses across Egypt. Support local, feel the pride.</p>
-        <a href="<?php echo SITE_URL; ?>/products.php" class="btn btn-primary">Shop All Products</a>
-        <a href="<?php echo SITE_URL; ?>/brands.php" class="btn btn-secondary">Explore Brands</a>
+        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary btn-lg">Shop All Products</a>
+        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/brands.php" class="btn btn-secondary btn-lg">Explore Brands</a>
     </div>
-    </section>
+</section>
 
-<section class="featured-categories">
+<section class="featured-categories animate-on-scroll">
     <h2>Featured Categories</h2>
     <div class="category-grid">
         <div class="category-item">
-            <a href="<?php echo SITE_URL; ?>/category.php?id=1">
+            <a href="<?php echo rtrim(SITE_URL, '/'); ?>/category.php?id=1"> 
                 <img src="https://placehold.co/300x200/E0E0E0/777?text=Clothing" alt="Clothing Category" 
                      onerror="this.onerror=null;this.src='https://placehold.co/300x200/E0E0E0/777?text=Image+Error';" 
                      class="rounded-md shadow-sm">
@@ -56,7 +54,7 @@ $db = getPDOConnection();
             </a>
         </div>
         <div class="category-item">
-            <a href="<?php echo SITE_URL; ?>/category.php?id=2">
+            <a href="<?php echo rtrim(SITE_URL, '/'); ?>/category.php?id=2"> 
                 <img src="https://placehold.co/300x200/D0D0D0/666?text=Home+Decor" alt="Home Decor Category"
                      onerror="this.onerror=null;this.src='https://placehold.co/300x200/D0D0D0/666?text=Image+Error';"
                      class="rounded-md shadow-sm">
@@ -64,7 +62,7 @@ $db = getPDOConnection();
             </a>
         </div>
         <div class="category-item">
-            <a href="<?php echo SITE_URL; ?>/category.php?id=3">
+            <a href="<?php echo rtrim(SITE_URL, '/'); ?>/category.php?id=3"> 
                 <img src="https://placehold.co/300x200/C0C0C0/555?text=Handicrafts" alt="Handicrafts Category"
                      onerror="this.onerror=null;this.src='https://placehold.co/300x200/C0C0C0/555?text=Image+Error';"
                      class="rounded-md shadow-sm">
@@ -72,7 +70,7 @@ $db = getPDOConnection();
             </a>
         </div>
         <div class="category-item">
-            <a href="<?php echo SITE_URL; ?>/category.php?id=4">
+            <a href="<?php echo rtrim(SITE_URL, '/'); ?>/category.php?id=4"> 
                 <img src="https://placehold.co/300x200/B0B0B0/444?text=Food+Products" alt="Food Products Category"
                      onerror="this.onerror=null;this.src='https://placehold.co/300x200/B0B0B0/444?text=Image+Error';"
                      class="rounded-md shadow-sm">
@@ -82,17 +80,13 @@ $db = getPDOConnection();
     </div>
 </section>
 
-<section class="featured-products">
+<section class="featured-products animate-on-scroll">
     <h2>New Arrivals</h2>
     <div class="product-grid">
         <?php
-        // Example: Fetch a few products from the database
-        // In a real scenario, you'd have a more robust way to select featured/new products
-        $products_html = ""; // Default message
+        $products_html = "<p>No new products to display at the moment. Check back soon!</p>"; 
         if ($db) {
             try {
-                // Fetch, for example, 4 active products, ordered by creation date descending
-                // Ensure products are active and belong to an approved brand.
                 $stmt = $db->query("
                     SELECT p.product_id, p.product_name, p.price, p.main_image_url, b.brand_name
                     FROM products p
@@ -104,10 +98,19 @@ $db = getPDOConnection();
                 $featured_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 if ($featured_products) {
-                    $products_html = ""; // Clear default message
+                    $products_html = ""; 
                     foreach ($featured_products as $product) {
-                        $product_url = SITE_URL . "/product.php?id=" . htmlspecialchars($product['product_id']);
-                        $image_url = !empty($product['main_image_url']) ? SITE_URL . "/" . htmlspecialchars($product['main_image_url']) : "https://placehold.co/250x250/F0F0F0/AAA?text=No+Image";
+                        $product_url = rtrim(SITE_URL, '/') . "/product.php?id=" . htmlspecialchars($product['product_id']);
+                        $image_path = !empty($product['main_image_url']) ? htmlspecialchars($product['main_image_url']) : '';
+                        // Check if main_image_url is a full URL or a relative path
+                        if (!empty($image_path) && (strpos($image_path, 'http://') === 0 || strpos($image_path, 'https://') === 0)) {
+                            $image_url = $image_path; // It's a full URL
+                        } elseif (!empty($image_path)) {
+                             // It's a relative path, prepend SITE_URL (which points to public)
+                            $image_url = rtrim(SITE_URL, '/') . '/' . ltrim($image_path, '/');
+                        } else {
+                            $image_url = "https://placehold.co/250x250/F0F0F0/AAA?text=No+Image";
+                        }
                         $fallback_image_url = "https://placehold.co/250x250/F0F0F0/AAA?text=Image+Error";
                         
                         $products_html .= "<div class='product-item'>";
@@ -117,14 +120,12 @@ $db = getPDOConnection();
                         $products_html .= "  </a>";
                         $products_html .= "  <p class='product-brand'>" . htmlspecialchars($product['brand_name']) . "</p>";
                         $products_html .= "  <p class='product-price'>" . CURRENCY_SYMBOL . htmlspecialchars(number_format($product['price'], 2)) . "</p>";
-                        $products_html .= "  <a href='" . SITE_URL . "/cart.php?action=add&id=" . htmlspecialchars($product['product_id']) . "' class='btn btn-sm btn-add-to-cart'>Add to Cart</a>";
+                        $products_html .= "  <a href='" . rtrim(SITE_URL, '/') . "/cart.php?action=add&id=" . htmlspecialchars($product['product_id']) . "' class='btn btn-sm btn-add-to-cart'>Add to Cart</a>";
                         $products_html .= "</div>";
                     }
                 }
             } catch (PDOException $e) {
-                // Log error, don't show to public in production
                 error_log("Error fetching featured products: " . $e->getMessage());
-                // $products_html variable will keep its default error message
             }
         }
         echo $products_html;
@@ -132,7 +133,7 @@ $db = getPDOConnection();
     </div>
 </section>
 
-<section class="how-it-works">
+<section class="how-it-works animate-on-scroll">
     <h2>Why Shop BaladyMall?</h2>
     <div class="features-grid">
         <div class="feature-item">
@@ -154,7 +155,6 @@ $db = getPDOConnection();
 </section>
 
 <?php
-// Include the footer.php
 if (file_exists($footer_path_from_public)) {
     require_once $footer_path_from_public;
 } else {
