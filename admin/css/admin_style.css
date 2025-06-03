@@ -3,7 +3,7 @@ body, html {
     margin: 0;
     padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; /* Consistent font */
-    background-color: #f0f2f5; /* Light grey background for admin area - Kept from previous for content backdrop */
+    background-color: #f0f2f5; /* Light grey background for admin area */
     color: #343a40; 
     line-height: 1.6;
     font-size: 15px;
@@ -25,20 +25,20 @@ a:hover {
     min-height: 100vh;
 }
 
-/* --- Admin Header (Reverted to Darker Theme) --- */
+/* --- Admin Header --- */
 .admin-header {
-    background-color: #2c3e50; /* Dark blue/grey - Reverted */
-    color: #ecf0f1; /* Light text - Reverted */
+    background-color: #2c3e50; /* Dark blue/grey */
+    color: #ecf0f1; /* Light text */
     padding: 0 25px;
     border-bottom: 1px solid #34495e; /* Darker border */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Kept subtle shadow */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
     position: sticky;
     top: 0;
     z-index: 1000;
 }
 
 .admin-header-inner {
-    max-width: 100%;
+    max-width: 100%; /* Allow full width */
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
@@ -47,11 +47,19 @@ a:hover {
 }
 
 .admin-logo a {
-    color: #ecf0f1; /* Light logo text - Reverted */
+    color: #ecf0f1; 
     text-decoration: none;
-    font-size: 1.5em; 
-    font-weight: 700; 
+    font-size: 1.4em; /* Slightly adjusted */
+    font-weight: 600; /* Adjusted weight */
+    display: flex;
+    align-items: center;
 }
+.admin-logo img {
+    max-height: 40px;
+    margin-right: 10px;
+    border-radius: 3px; /* Optional: if logo has a background */
+}
+
 
 .admin-main-nav ul {
     list-style: none;
@@ -66,14 +74,14 @@ a:hover {
     font-size: 0.95em;
 }
 .admin-main-nav li:first-child { /* Welcome message */
-    color: #bdc3c7; /* Lighter grey for welcome text - Reverted */
+    color: #bdc3c7; 
     font-weight: 500;
     padding-right: 10px;
 }
 
 
 .admin-main-nav a {
-    color: #bdc3c7; /* Lighter grey for links - Reverted */
+    color: #bdc3c7; 
     text-decoration: none;
     padding: 10px 12px; 
     border-radius: 5px;
@@ -83,12 +91,12 @@ a:hover {
 
 .admin-main-nav a:hover,
 .admin-main-nav a.active { 
-    color: #ffffff; /* White for active/hover link text - Reverted */
-    background-color: #34495e; /* Slightly lighter dark blue for active/hover bg - Reverted */
+    color: #ffffff; 
+    background-color: #34495e; 
     text-decoration: none;
 }
 .admin-main-nav .logout-link {
-    color: #e74c3c; /* Brighter red for logout on dark bg */
+    color: #e74c3c; 
     font-weight: 500;
 }
 .admin-main-nav .logout-link:hover {
@@ -97,88 +105,89 @@ a:hover {
 }
 
 
-/* --- Admin Main Content (Keeping lighter background for content readability) --- */
+/* --- Admin Main Content --- */
 .admin-main {
     flex-grow: 1;
-    padding: 30px; 
+    padding: 25px; /* Slightly reduced padding */
 }
 
 .admin-container {
-    background-color: #ffffff; /* White background for content boxes */
-    padding: 25px 30px; 
-    border-radius: 10px; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+    background-color: #ffffff; 
+    padding: 20px 25px; /* Slightly reduced padding */
+    border-radius: 8px; /* Slightly reduced radius */
+    box-shadow: 0 3px 10px rgba(0,0,0,0.06); /* Adjusted shadow */
     max-width: 100%; 
 }
 
 .admin-footer {
     text-align: center;
-    padding: 20px; 
-    background-color: #e9ecef; /* Lighter footer background */
+    padding: 18px; /* Slightly reduced */
+    background-color: #e9ecef; 
     border-top: 1px solid #dee2e6;
-    font-size: 0.9em;
+    font-size: 0.88em; /* Slightly reduced */
     color: #6c757d;
 }
 
 /* Page Title */
 .admin-page-title {
-    font-size: 2em; 
-    color: #343a40; /* Dark title text */
-    margin-bottom: 25px;
-    padding-bottom: 15px;
+    font-size: 1.8em; /* Adjusted */
+    color: #343a40; 
+    margin-bottom: 20px; /* Adjusted */
+    padding-bottom: 12px; /* Adjusted */
     border-bottom: 1px solid #e9ecef; 
     font-weight: 600;
 }
 
-/* --- Stat Cards for Dashboard (Keeping modern look) --- */
+/* --- Stat Cards for Dashboard --- */
 .stat-cards-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-    gap: 25px;
-    margin-bottom: 35px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); /* Adjusted minmax */
+    gap: 20px; /* Adjusted gap */
+    margin-bottom: 30px; /* Adjusted */
 }
 
 .stat-card {
     background-color: #fff;
-    padding: 25px;
-    border-radius: 8px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.07);
-    border-left: 5px solid; 
+    padding: 20px; /* Adjusted */
+    border-radius: 6px; /* Adjusted */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); /* Adjusted */
+    border-left: 4px solid; /* Adjusted */
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+    transform: translateY(-3px); /* Adjusted */
+    box-shadow: 0 5px 12px rgba(0,0,0,0.08); /* Adjusted */
 }
 
 .stat-card.total-sales { border-left-color: #28a745; } 
 .stat-card.total-orders { border-left-color: #007bff; } 
+.stat-card.average-order { border-left-color: #6f42c1; } /* Added purple for average order */
 .stat-card.total-users { border-left-color: #ffc107; } 
 .stat-card.pending-brands { border-left-color: #fd7e14; } 
 
 .stat-card h3 {
     margin-top: 0;
-    font-size: 1.05em; 
+    font-size: 0.95em; /* Adjusted */
     color: #6c757d; 
-    margin-bottom: 8px; 
+    margin-bottom: 6px; /* Adjusted */
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px; /* Adjusted */
     font-weight: 500;
 }
 
 .stat-card .stat-value {
-    font-size: 2.4em; 
+    font-size: 2.2em; /* Adjusted */
     font-weight: 700; 
     color: #343a40;
-    margin-bottom: 10px;
+    margin-bottom: 8px; /* Adjusted */
 }
 
 .stat-card .stat-description {
-    font-size: 0.95em; 
+    font-size: 0.9em; /* Adjusted */
     color: #6c757d;
 }
 .stat-card .stat-link a {
-    font-size: 0.95em;
+    font-size: 0.9em; /* Adjusted */
     color: #007bff;
     text-decoration: none;
     font-weight: 500;
@@ -188,28 +197,28 @@ a:hover {
 }
 
 
-/* --- Admin Table Styling (Keeping modern look) --- */
+/* --- Admin Table Styling --- */
 .admin-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 25px;
-    font-size: 0.95em;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    border-radius: 8px; 
+    margin-top: 20px; /* Adjusted */
+    font-size: 0.92em; /* Adjusted */
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05); /* Adjusted */
+    border-radius: 6px; 
     overflow: hidden; 
 }
 .admin-table th,
 .admin-table td {
-    border-bottom: 1px solid #dee2e6; 
-    padding: 12px 15px; 
+    border-bottom: 1px solid #e9ecef; /* Lighter border */
+    padding: 10px 14px; /* Adjusted */
     text-align: left;
     vertical-align: middle;
 }
 .admin-table td:first-child, .admin-table th:first-child {
-    padding-left: 20px;
+    padding-left: 18px; /* Adjusted */
 }
 .admin-table td:last-child, .admin-table th:last-child {
-    padding-right: 20px;
+    padding-right: 18px; /* Adjusted */
 }
 
 .admin-table thead th {
@@ -217,20 +226,21 @@ a:hover {
     font-weight: 600; 
     color: #495057;
     text-transform: uppercase;
-    font-size: 0.85em; 
-    letter-spacing: 0.5px;
+    font-size: 0.8em; /* Adjusted */
+    letter-spacing: 0.4px; /* Adjusted */
     border-bottom-width: 2px; 
+    border-bottom-color: #dee2e6;
 }
 .admin-table tbody tr:nth-child(even) {
-    background-color: #fdfdfd; 
+    background-color: #fcfcfc; /* Very light grey for even rows */
 }
 .admin-table tbody tr:hover {
     background-color: #f1f3f7; 
 }
 .admin-table .actions a, .admin-table .actions button {
-    margin-right: 8px;
-    padding: 6px 10px; 
-    font-size: 0.85em; 
+    margin-right: 6px; /* Adjusted */
+    padding: 5px 9px; /* Adjusted */
+    font-size: 0.82em; /* Adjusted */
     text-decoration: none;
     border-radius: 4px;
     cursor: pointer;
@@ -241,14 +251,16 @@ a:hover {
     margin-right: 0;
 }
 
-/* Consistent Button Styles (similar to public site .btn) */
+/* Consistent Button Styles (used in tables and forms) */
+.btn-edit, .btn-approve, .btn-suspend, .btn-view, .btn-submit, .admin-filters button,
 .admin-table .actions .btn-edit,
 .admin-table .actions .btn-approve,
 .admin-table .actions .btn-suspend,
 .admin-table .actions .btn-view,
 .admin-form .btn-submit, 
 .admin-filters button, 
-.admin-page-title + a.btn-submit 
+.admin-page-title + a.btn-submit,
+.admin-container > p > a.btn-submit /* For Add New buttons */
  {
     display: inline-block;
     font-weight: 500;
@@ -256,67 +268,79 @@ a:hover {
     vertical-align: middle;
     user-select: none;
     border: 1px solid transparent;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem; /* Adjusted padding */
+    font-size: 0.88rem; /* Adjusted font size */
     line-height: 1.5;
     border-radius: 0.25rem;
     transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
-.admin-table .actions .btn-edit:hover,
-.admin-table .actions .btn-approve:hover,
-.admin-table .actions .btn-suspend:hover,
-.admin-table .actions .btn-view:hover,
-.admin-form .btn-submit:hover,
-.admin-filters button:hover,
-.admin-page-title + a.btn-submit:hover {
+.btn-edit:hover, .btn-approve:hover, .btn-suspend:hover, .btn-view:hover, .btn-submit:hover, 
+.admin-filters button:hover, .admin-page-title + a.btn-submit:hover,
+.admin-container > p > a.btn-submit:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 
-.admin-table .actions .btn-edit { color: #212529; background-color: #ffc107; border-color: #ffc107; }
-.admin-table .actions .btn-edit:hover { background-color: #e0a800; border-color: #d39e00; }
+.btn-edit { color: #212529; background-color: #ffc107; border-color: #ffc107; }
+.btn-edit:hover { background-color: #e0a800; border-color: #d39e00; color: #212529; }
 
-.admin-table .actions .btn-approve { color: #fff; background-color: #28a745; border-color: #28a745; }
-.admin-table .actions .btn-approve:hover { background-color: #218838; border-color: #1e7e34; }
+.btn-approve { color: #fff; background-color: #28a745; border-color: #28a745; }
+.btn-approve:hover { background-color: #218838; border-color: #1e7e34; color: #fff; }
 
-.admin-table .actions .btn-suspend { color: #fff; background-color: #dc3545; border-color: #dc3545; }
-.admin-table .actions .btn-suspend:hover { background-color: #c82333; border-color: #bd2130; }
+.btn-suspend { color: #fff; background-color: #dc3545; border-color: #dc3545; }
+.btn-suspend:hover { background-color: #c82333; border-color: #bd2130; color: #fff; }
 
-.admin-table .actions .btn-view { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
-.admin-table .actions .btn-view:hover { background-color: #138496; border-color: #117a8b; }
+.btn-view { color: #fff; background-color: #17a2b8; border-color: #17a2b8; }
+.btn-view:hover { background-color: #138496; border-color: #117a8b; color: #fff; }
 
-.admin-form .btn-submit,
-.admin-page-title + a.btn-submit { 
+.btn-submit,
+.admin-form .btn-submit, /* Ensure specificity for form submit buttons */
+.admin-page-title + a.btn-submit,
+.admin-container > p > a.btn-submit { 
     background-color: #007bff; color: white; border-color: #007bff;
 }
+.btn-submit:hover,
 .admin-form .btn-submit:hover,
-.admin-page-title + a.btn-submit:hover {
-    background-color: #0056b3; border-color: #0056b3;
+.admin-page-title + a.btn-submit:hover,
+.admin-container > p > a.btn-submit:hover {
+    background-color: #0056b3; border-color: #0056b3; color: white;
 }
 .admin-filters button {
     background-color: #6c757d; color: white; border-color: #6c757d;
 }
 .admin-filters button:hover {
-    background-color: #5a6268; border-color: #545b62;
+    background-color: #5a6268; border-color: #545b62; color: white;
 }
 
 
-/* Status indicators in tables */
+/* Status indicators in tables (Products, Orders, etc.) */
+.admin-table .status-active, .admin-table .status-delivered { color: #28a745; font-weight: 500; }
+.admin-table .status-inactive, .admin-table .status-cancelled, .admin-table .status-refunded { color: #dc3545; text-decoration: line-through;}
+.admin-table .status-pending-payment { color: #ffc107; font-weight: 500; } 
 .admin-table .status-processing { color: #007bff; font-weight: 500; }
 .admin-table .status-shipped { color: #fd7e14; font-weight: 500; } 
-.admin-table .status-delivered { color: #28a745; font-weight: 500; }
-.admin-table .status-pending-payment { color: #ffc107; font-weight: 500; } 
-.admin-table .status-cancelled, .admin-table .status-refunded { color: #dc3545; text-decoration: line-through;}
 
 
-/* --- Form styling for admin (Keeping modern look) --- */
+/* --- Form styling for admin --- */
+.admin-form fieldset {
+    border: 1px solid #e0e0e0;
+    padding: 20px;
+    margin-bottom: 25px;
+    border-radius: 6px;
+}
+.admin-form legend {
+    font-weight: 600;
+    color: #333;
+    padding: 0 10px;
+    font-size: 1.1em;
+}
 .admin-form .form-group {
-    margin-bottom: 20px; 
+    margin-bottom: 18px; /* Adjusted */
 }
 .admin-form .form-group label {
     display: block;
-    margin-bottom: 8px; 
+    margin-bottom: 7px; /* Adjusted */
     font-weight: 500;
     color: #495057; 
 }
@@ -325,10 +349,11 @@ a:hover {
 .admin-form .form-group input[type="number"],
 .admin-form .form-group input[type="url"],
 .admin-form .form-group input[type="tel"],
+.admin-form .form-group input[type="password"], /* Added password type */
 .admin-form .form-group select,
 .admin-form .form-group textarea {
     width: 100%;
-    padding: 10px 12px; 
+    padding: 9px 11px; /* Adjusted */
     border: 1px solid #ced4da;
     border-radius: 5px; 
     font-size: 0.95em;
@@ -340,7 +365,7 @@ a:hover {
 .admin-form .form-group textarea:focus {
     border-color: #007bff;
     outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.2); 
+    box-shadow: 0 0 0 0.15rem rgba(0, 123, 255, 0.2); /* Adjusted shadow */
 }
 .admin-form .form-group textarea {
     min-height: 100px; 
@@ -348,6 +373,7 @@ a:hover {
 .admin-form .form-group input[type="checkbox"] {
     margin-right: 8px;
     vertical-align: middle;
+    width: auto; /* Override width 100% for checkbox */
 }
 .admin-form .form-group small { 
     display: block;
@@ -360,7 +386,7 @@ a:hover {
 }
 
 
-/* --- Admin Messages (Success, Error, Info) (Keeping modern look) --- */
+/* --- Admin Messages (Success, Error, Info) --- */
 .admin-message {
     padding: 12px 18px; 
     margin-bottom: 20px; 
@@ -393,7 +419,7 @@ a:hover {
 .mt-2 { margin-top: 0.5rem !important; }
 .mt-3 { margin-top: 1rem !important; }
 
-/* Admin Filters (e.g., on brands.php) */
+/* Admin Filters (e.g., on brands.php, products.php) */
 .admin-filters {
     padding: 15px;
     background-color: #f8f9fa;
@@ -411,13 +437,135 @@ a:hover {
     font-weight: 500;
     margin-bottom: 0; 
 }
-.admin-filters select {
+.admin-filters select, .admin-filters input[type="date"], .admin-filters input[type="text"] {
     padding: 8px 10px;
     border-radius: 4px;
     border: 1px solid #ced4da;
     font-size: 0.9em;
 }
 .admin-filters button { 
-    padding: 8px 12px;
+    padding: 8px 12px; /* Uses .btn-submit styles now */
 }
+
+/* Pagination Styling */
+.pagination {
+    margin-top: 25px;
+    text-align: center;
+    padding-bottom: 10px;
+}
+.pagination a, .pagination span {
+    display: inline-block;
+    padding: 8px 12px;
+    margin: 0 3px;
+    border: 1px solid #dee2e6;
+    color: #007bff;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+.pagination a:hover {
+    background-color: #e9ecef;
+    color: #0056b3;
+}
+.pagination span.current-page { /* If you add a span for current page */
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+    font-weight: bold;
+}
+.pagination span.disabled { /* If you add disabled prev/next */
+    color: #6c757d;
+    border-color: #dee2e6;
+    cursor: not-allowed;
+}
+
+
+/* Chart Containers (from admin/index.php) */
+.charts-section .admin-section-title {
+    margin-bottom: 20px;
+}
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+}
+.chart-container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+    height: 350px; /* Fixed height for charts */
+    position: relative; /* For Chart.js responsiveness */
+}
+.chart-container h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    text-align: center;
+    font-size: 1.1em;
+    color: #333;
+    font-weight: 500;
+}
+
+/* For side-by-side sections like recent orders and top brands */
+.admin-section-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 25px;
+    margin-top: 30px;
+}
+.admin-section-row > .admin-section {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+}
+.recent-orders-section {
+    flex: 2 1 500px; /* Takes more space */
+}
+.top-brands-section {
+    flex: 1 1 300px; /* Takes less space */
+}
+
+/* Order Detail Page Specific Styles */
+.order-detail-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+.order-detail-container > div { /* Sections like summary, customer, shipping */
+    flex: 1 1 320px; /* Adjust min-width as needed */
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+    margin-bottom: 20px; /* For spacing if they stack */
+}
+.order-detail-container h2, .order-detail-container h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+.ordered-items-section, .order-totals-notes-section > div {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.07);
+    margin-top: 20px;
+}
+.order-totals-notes-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+.order-notes {
+    flex: 1 1 300px;
+}
+.order-totals {
+    flex: 1 1 300px;
+    text-align: right;
+}
+.order-totals p { margin-bottom: 8px; }
+.order-totals hr { margin: 10px 0; border-color: #eee; }
 
