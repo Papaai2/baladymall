@@ -11,7 +11,7 @@ $footer_path_from_public = __DIR__ . '/../src/includes/footer.php';
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
-    die("Critical error: Main configuration file not found. Expected at: " . $config_path_from_public);
+    die("Critical error: Main configuration file not found. Expected at: " . htmlspecialchars($config_path_from_public));
 }
 
 if (file_exists($header_path_from_public)) {
@@ -22,8 +22,9 @@ if (file_exists($header_path_from_public)) {
 
 // Ensure user is logged in
 if (!isset($_SESSION['user_id'])) {
-    $_SESSION['redirect_after_login'] = rtrim(SITE_URL, '/') . "/order_detail.php?order_id=" . ($_GET['order_id'] ?? ''); // Store current page
-    header("Location: " . rtrim(SITE_URL, '/') . "/login.php?auth=required&target=order_detail");
+    // Use get_asset_url for the redirect path and target URL
+    $_SESSION['redirect_after_login'] = get_asset_url("order_detail.php?order_id=" . ($_GET['order_id'] ?? '')); // Store current page
+    header("Location: " . get_asset_url("login.php?auth=required&target=order_detail"));
     exit;
 }
 $user_id = (int)$_SESSION['user_id'];
@@ -91,6 +92,11 @@ if (empty($page_error_message) && $order_id > 0 && isset($db) && $db instanceof 
         error_log("Order Detail Page DB Error (Order ID: $order_id, User ID: $user_id): " . $e->getMessage());
         $page_error_message = "An error occurred while loading order details. Please try again later.";
     }
+} else {
+    // If DB connection fails even without a page_error_message, set one
+    if (empty($page_error_message) && (!isset($db) || !$db instanceof PDO)) {
+        $page_error_message = "Database connection is not available. Cannot load order details.";
+    }
 }
 
 ?>
@@ -103,11 +109,13 @@ if (empty($page_error_message) && $order_id > 0 && isset($db) && $db instanceof 
             <div class="page-content">
                 <div class="form-message error-message text-center">
                     <?php echo esc_html($page_error_message); ?>
-                    <p class="mt-3"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=orders" class="btn btn-primary">Back to Order History</a></p>
+                    <p class="mt-3"><a href="<?php echo get_asset_url('my_account.php?view=orders'); ?>" class="btn btn-primary">Back to Order History</a></p>
                 </div>
             </div>
         <?php elseif ($order_details): ?>
-            <div class="page-content"> <div class="order-detail-summary-grid"> <div class="order-info-block order-detail-card">
+            <div class="page-content">
+                <div class="order-detail-summary-grid">
+                    <div class="order-info-block order-detail-card">
                         <h3>Order Information</h3>
                         <p><strong>Order Date:</strong> <span><?php echo esc_html(date("F j, Y, g:i a", strtotime($order_details['order_date']))); ?></span></p>
                         <p><strong>Status:</strong> <span class="order-status-badge status-<?php echo esc_html(str_replace(' ', '-', $order_details['order_status'])); ?>"><?php echo esc_html(ucfirst(str_replace('_', ' ', $order_details['order_status']))); ?></span></p>
@@ -167,24 +175,38 @@ if (empty($page_error_message) && $order_id > 0 && isset($db) && $db instanceof 
                             <tbody>
                                 <?php foreach ($order_items as $item): ?>
                                     <?php
-                                        $product_item_url = rtrim(SITE_URL, '/') . "/product_detail.php?id=" . esc_html($item['product_id']);
-                                        $item_image_url_display = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/F0F0F0/AAA?text=No+Image" : '#';
+                                        // Use get_asset_url for product item link and image URLs
+                                        $product_item_url = get_asset_url("product_detail.php?id=" . esc_html($item['product_id']));
+                                        $item_image_url_display = '';
+
+                                        // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
+                                        $fallback_order_item_image_esc = '';
+                                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                                            $fallback_order_item_image_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/CCC/777?text=Error");
+                                        } else {
+                                            $fallback_order_item_image_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
+                                        }
+
+                                        // Fix: Use get_asset_url for consistency in image paths, adjusting for 'products/filename.jpg'
                                         if (!empty($item['main_image_url'])) {
-                                            if (strpos($item['main_image_url'], 'http://') === 0 || strpos($item['main_image_url'], 'https://') === 0) {
+                                            if (filter_var($item['main_image_url'], FILTER_VALIDATE_URL)) {
                                                 $item_image_url_display = esc_html($item['main_image_url']);
-                                            } elseif (defined('PUBLIC_UPLOADS_URL_BASE')) {
-                                                $item_image_url_display = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim(esc_html($item['main_image_url']), '/');
-                                            } else { // Fallback if PUBLIC_UPLOADS_URL_BASE not defined
-                                                $item_image_url_display = rtrim(SITE_URL, '/') . '/' . ltrim(esc_html($item['main_image_url']), '/');
+                                            } else {
+                                                // Assuming $item['main_image_url'] starts with 'products/'. Prepends 'uploads/'
+                                                $item_image_url_display = get_asset_url('uploads/' . ltrim(esc_html($item['main_image_url']), '/'));
                                             }
                                         }
-                                        $fallback_cart_item_image = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/CCC/777?text=Error" : '#';
+
+                                        // If main $item_image_url_display is still empty, set it to the fallback
+                                        if (empty($item_image_url_display)) {
+                                            $item_image_url_display = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/F0F0F0/AAA?text=No+Image" : $fallback_order_item_image_esc;
+                                        }
                                     ?>
                                     <tr>
                                         <td class="order-item-image" data-label="Image" style="width: 80px;">
                                             <a href="<?php echo $product_item_url; ?>">
                                                 <img src="<?php echo $item_image_url_display; ?>" alt="<?php echo esc_html($item['product_name']); ?>"
-                                                     onerror="this.onerror=null;this.src='<?php echo $fallback_cart_item_image; ?>';">
+                                                     onerror="this.onerror=null;this.src='<?php echo $fallback_order_item_image_esc; ?>';">
                                             </a>
                                         </td>
                                         <td class="order-item-name" data-label="Product">
@@ -204,13 +226,14 @@ if (empty($page_error_message) && $order_id > 0 && isset($db) && $db instanceof 
                 <?php endif; ?>
 
                 <div class="text-center mt-5">
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=orders" class="btn btn-outline-secondary">
+                    <a href="<?php echo get_asset_url('my_account.php?view=orders'); ?>" class="btn btn-outline-secondary">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16" style="margin-right:5px; vertical-align: text-bottom;"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/></svg>
                         Back to Order History
                     </a>
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary">Continue Shopping</a>
+                    <a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-primary">Continue Shopping</a>
                 </div>
-            </div> <?php endif; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </section>
 

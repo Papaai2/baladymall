@@ -22,7 +22,7 @@ if (file_exists($header_path)) {
 
 // Redirect if user is already logged in
 if (isset($_SESSION['user_id'])) {
-    header("Location: " . rtrim(SITE_URL, '/') . "/my_account.php");
+    header("Location: " . get_asset_url("my_account.php"));
     exit;
 }
 
@@ -105,20 +105,20 @@ if ($token_valid && $_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset_
 
             // Send password reset success email
             $email_subject = SITE_NAME . " - Your Password Has Been Reset";
-            $email_body = "Hello " . htmlspecialchars($user_username_from_token) . ",\n\n";
+            $email_body = "Hello " . esc_html($user_username_from_token) . ",\n\n";
             $email_body .= "Your password for your " . SITE_NAME . " account has been successfully reset.\n\n";
             $email_body .= "If you did not perform this action, please contact support immediately.\n\n";
             $email_body .= "Regards,\n" . SITE_NAME . " Team";
 
             if (send_email($user_email_from_token, $email_subject, $email_body)) {
                 $_SESSION['password_reset_success'] = true; // Use session to show success message on login page
-                header("Location: " . rtrim(SITE_URL, '/') . "/login.php?password_reset=success");
+                header("Location: " . get_asset_url("login.php?password_reset=success"));
                 exit;
             } else {
                 // If email sending fails, still redirect as password was reset successfully in DB
                 error_log("Failed to send password reset success email to {$user_email_from_token} for user {$user_id_from_token}.");
                 $_SESSION['password_reset_success'] = true;
-                header("Location: " . rtrim(SITE_URL, '/') . "/login.php?password_reset=success&email_fail=true");
+                header("Location: " . get_asset_url("login.php?password_reset=success&email_fail=true"));
                 exit;
             }
 
@@ -139,12 +139,12 @@ if ($token_valid && $_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset_
 ?>
 
 <section class="auth-form-section">
-    <h2><?php echo htmlspecialchars($page_title); ?></h2>
+    <h2><?php echo esc_html($page_title); ?></h2>
 
     <?php if (!empty($message)) echo $message; ?>
 
     <?php if ($token_valid): ?>
-        <p>Enter your new password for <?php echo htmlspecialchars($user_email_from_token); ?>.</p>
+        <p>Enter your new password for <?php echo esc_html($user_email_from_token); ?>.</p>
         <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]) . "?token=" . urlencode($token_param) . "&email=" . urlencode($email_param); ?>" method="POST" class="auth-form" novalidate>
             <fieldset>
                 <legend>New Password</legend>
@@ -165,7 +165,7 @@ if ($token_valid && $_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset_
             </div>
         </form>
     <?php else: ?>
-        <p>If you need to reset your password, please <a href="<?php echo rtrim(SITE_URL, '/'); ?>/forgot_password.php">request a new reset link</a>.</p>
+        <p>If you need to reset your password, please <a href="<?php echo get_asset_url('forgot_password.php'); ?>">request a new reset link</a>.</p>
     <?php endif; ?>
 
 </section>

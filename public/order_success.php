@@ -46,8 +46,8 @@ $error_message = '';
 // Check if user is logged in - they should be if they just placed an order
 if (!isset($_SESSION['user_id'])) {
     // This case should ideally not happen if checkout requires login
-    $_SESSION['redirect_after_login'] = rtrim(SITE_URL, '/') . "/my_account.php?view=orders"; // Redirect to orders after login
-    header("Location: " . rtrim(SITE_URL, '/') . "/login.php?auth=required&target=order_confirmation");
+    $_SESSION['redirect_after_login'] = get_asset_url("my_account.php?view=orders"); // Redirect to orders after login
+    header("Location: " . get_asset_url("login.php?auth=required&target=order_confirmation"));
     exit;
 }
 $user_id = (int)$_SESSION['user_id'];
@@ -59,9 +59,9 @@ if (isset($_SESSION['last_order_id'])) {
     if ($db_available) {
         try {
             // Fetch basic order details to confirm it belongs to the current user and exists
-            $stmt = $db->prepare("SELECT order_id, order_date, total_amount, shipping_name, payment_method 
-                                  FROM orders 
-                                  WHERE order_id = :order_id AND customer_id = :customer_id 
+            $stmt = $db->prepare("SELECT order_id, order_date, total_amount, shipping_name, payment_method
+                                  FROM orders
+                                  WHERE order_id = :order_id AND customer_id = :customer_id
                                   LIMIT 1");
             $stmt->bindParam(':order_id', $last_order_id, PDO::PARAM_INT);
             $stmt->bindParam(':customer_id', $user_id, PDO::PARAM_INT);
@@ -71,7 +71,7 @@ if (isset($_SESSION['last_order_id'])) {
             if (!$order_details) {
                 $error_message = "Could not retrieve your recent order details. Please check your account or contact support.";
             }
-            
+
             // Clear the last_order_id from session to prevent re-display on refresh
             // or if user navigates back to this page without placing a new order.
             unset($_SESSION['last_order_id']);
@@ -96,31 +96,31 @@ if (isset($_SESSION['last_order_id'])) {
 
         <?php if (!empty($error_message) && !$order_details): ?>
             <div class="order-confirmation-box error-box">
-                <?php 
-                // Assuming you have an SVG or image for errors in public/images/
-                $error_icon_url = defined('SITE_URL') ? rtrim(SITE_URL, '/') . '/images/order-error.svg' : 'images/order-error.svg'; 
-                $error_icon_alt = "Order Error Icon"; 
+                <?php
+                // Use get_asset_url for image paths
+                $error_icon_url = get_asset_url('images/order-error.svg');
+                $error_icon_alt = "Order Error Icon";
                 ?>
-                <img src="<?php echo esc_html($error_icon_url); ?>" alt="<?php echo esc_html($error_icon_alt); ?>" class="confirmation-icon" 
-                     onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', '<p style=\'font-size: 2.5em; color: #dc3545; margin-bottom:15px;\'>&#10008;</p>');"> 
+                <img src="<?php echo esc_html($error_icon_url); ?>" alt="<?php echo esc_html($error_icon_alt); ?>" class="confirmation-icon"
+                     onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', '<p style=\'font-size: 2.5em; color: #dc3545; margin-bottom:15px;\'>&#10008;</p>');">
                 <h2>Order Information Not Found</h2>
                 <p><?php echo esc_html($error_message); ?></p>
                 <div class="confirmation-actions">
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary">Continue Shopping</a>
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=orders" class="btn btn-outline-secondary">View My Orders</a>
+                    <a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-primary">Continue Shopping</a>
+                    <a href="<?php echo get_asset_url('my_account.php?view=orders'); ?>" class="btn btn-outline-secondary">View My Orders</a>
                 </div>
             </div>
         <?php elseif ($order_details): ?>
             <div class="order-confirmation-box success-box">
-                <?php 
-                $success_icon_url = defined('SITE_URL') ? rtrim(SITE_URL, '/') . '/images/order-success.svg' : 'images/order-success.svg'; 
+                <?php
+                $success_icon_url = get_asset_url('images/order-success.svg');
                 $success_icon_alt = "Order Success Icon";
                 ?>
                  <img src="<?php echo esc_html($success_icon_url); ?>" alt="<?php echo esc_html($success_icon_alt); ?>" class="confirmation-icon"
-                      onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', '<p style=\'font-size: 2.5em; color: #28a745; margin-bottom:15px;\'>&#10004;</p>');"> 
+                      onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', '<p style=\'font-size: 2.5em; color: #28a745; margin-bottom:15px;\'>&#10004;</p>');">
                 <h2>Thank You For Your Order, <?php echo esc_html($_SESSION['first_name'] ?? 'Valued Customer'); ?>!</h2>
                 <p class="lead-text">Your order has been placed successfully.</p>
-                
+
                 <div class="order-summary-brief">
                     <p><strong>Order ID:</strong> #<?php echo esc_html($order_details['order_id']); ?></p>
                     <p><strong>Order Date:</strong> <?php echo esc_html(date("F j, Y, g:i a", strtotime($order_details['order_date']))); ?></p>
@@ -131,27 +131,27 @@ if (isset($_SESSION['last_order_id'])) {
 
                 <p class="mt-4">You will receive an email confirmation shortly with the full details of your order. <br>
                    (Note: Email sending functionality is not yet implemented in this version.)</p>
-                
-                <p>If you have any questions, please don't hesitate to <a href="<?php echo rtrim(SITE_URL, '/'); ?>/contact.php">contact us</a>.</p>
+
+                <p>If you have any questions, please don't hesitate to <a href="<?php echo get_asset_url('contact.php'); ?>">contact us</a>.</p>
 
                 <div class="confirmation-actions">
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary">Continue Shopping</a>
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/order_detail.php?order_id=<?php echo esc_html($order_details['order_id']); ?>" class="btn btn-outline-secondary">View Order Details</a> 
+                    <a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-primary">Continue Shopping</a>
+                    <a href="<?php echo get_asset_url('order_detail.php?order_id=' . esc_html($order_details['order_id'])); ?>" class="btn btn-outline-secondary">View Order Details</a>
                 </div>
             </div>
         <?php else: // Fallback if $error_message is empty but $order_details is also null (e.g. direct access after session cleared) ?>
              <div class="order-confirmation-box info-box">
-                <?php 
-                $info_icon_url = defined('SITE_URL') ? rtrim(SITE_URL, '/') . '/images/order-info.svg' : 'images/order-info.svg';
+                <?php
+                $info_icon_url = get_asset_url('images/order-info.svg');
                 $info_icon_alt = "Order Information Icon";
                 ?>
                 <img src="<?php echo esc_html($info_icon_url); ?>" alt="<?php echo esc_html($info_icon_alt); ?>" class="confirmation-icon"
-                     onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', '<p style=\'font-size: 2.5em; color: #17a2b8; margin-bottom:15px;\'>&#8505;</p>');"> {/* Info icon fallback */}
+                     onerror="this.style.display='none'; this.parentElement.insertAdjacentHTML('afterbegin', '<p style=\'font-size: 2.5em; color: #17a2b8; margin-bottom:15px;\'>&#8505;</p>');">
                 <h2>Order Status</h2>
                 <p>Looking for your order details? You can find all your past orders in your account.</p>
                  <div class="confirmation-actions">
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary">Continue Shopping</a>
-                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=orders" class="btn btn-outline-secondary">View My Orders</a>
+                    <a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-primary">Continue Shopping</a>
+                    <a href="<?php echo get_asset_url('my_account.php?view=orders'); ?>" class="btn btn-outline-secondary">View My Orders</a>
                 </div>
             </div>
         <?php endif; ?>

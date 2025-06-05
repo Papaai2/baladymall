@@ -21,7 +21,7 @@ if (file_exists($config_path_from_public)) {
 }
 
 // Now that config.php is loaded, SITE_URL and other constants like PROJECT_ROOT_PATH should be available.
-// Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
+// Define header and footer paths using PROJECT_ROOT_PATH for robustness.
 $header_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/header.php' : __DIR__ . '/../src/includes/header.php';
 $footer_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/footer.php' : __DIR__ . '/../src/includes/footer.php';
 
@@ -34,9 +34,7 @@ if (file_exists($header_path)) {
 
 // Redirect if user is already logged in
 if (isset($_SESSION['user_id'])) {
-    $redirect_url_if_already_loggedin = rtrim(SITE_URL, '/') . "/my_account.php";
-    // This existing logic for redirecting to admin/brand_admin panels is now modified.
-    // Super/Brand Admins will go to public index by default after login.
+    $redirect_url_if_already_loggedin = get_asset_url("my_account.php"); // Use get_asset_url
     header("Location: " . $redirect_url_if_already_loggedin);
     exit;
 }
@@ -100,7 +98,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
                     $_SESSION['phone_number'] = $user['phone_number'];
 
                     // Determine redirect target. All roles go to public index after login.
-                    $redirect_target = rtrim(SITE_URL, '/') . "/index.php?login=success";
+                    $redirect_target = get_asset_url("index.php?login=success"); // Use get_asset_url
 
                     // Handle redirect after login if a destination was stored (e.g., from checkout)
                     if(isset($_SESSION['redirect_after_login'])) {
@@ -134,9 +132,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
             Registration successful! You can now login.
         </div>
     <?php endif; ?>
-    <?php if (isset($_GET['logout']) && $_GET['logout'] === 'success'):
-        echo "<div class='form-message success-message'>You have been successfully logged out.</div>";
-    endif; ?>
+    <?php if (isset($_GET['logout']) && $_GET['logout'] === 'success'): ?>
+        <div class="form-message success-message">
+            You have been successfully logged out.
+        </div>
+    <?php endif; ?>
      <?php if (isset($_GET['verified']) && $_GET['verified'] === 'success'): ?>
         <div class="form-message success-message">
             Email verified successfully! You can now login.
@@ -185,8 +185,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
             <button type="submit" name="login" class="btn btn-primary btn-block btn-lg">Login</button>
         </div>
 
-        <p class="form-switch-link"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/forgot_password.php">Forgot your password?</a></p>
-        <p class="form-switch-link">Don't have an account? <a href="<?php echo rtrim(SITE_URL, '/'); ?>/register.php">Register here</a>.</p>
+        <p class="form-switch-link"><a href="<?php echo get_asset_url('forgot_password.php'); ?>">Forgot your password?</a></p>
+        <p class="form-switch-link">Don't have an account? <a href="<?php echo get_asset_url('register.php'); ?>">Register here</a>.</p>
     </form>
 </section>
 

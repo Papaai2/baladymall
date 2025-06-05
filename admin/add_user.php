@@ -17,7 +17,7 @@ $db = getPDOConnection();
 $errors = [];
 $message = '';
 
-// Form data placeholders for sticky form
+// Form data placeholders for sticky form - Initialized with empty strings for htmlspecialchars safety
 $username_form = '';
 $email_form = '';
 $first_name_form = '';
@@ -47,6 +47,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
         $errors['username'] = "Username is required.";
     } elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username_form)) {
         $errors['username'] = "Username must be 3-20 characters long and contain only letters, numbers, and underscores.";
+    } elseif (strlen($username_form) > 20) { // Explicit check for maxlength
+        $errors['username'] = "Username cannot exceed 20 characters.";
     }
 
     if (empty($email_form)) {
@@ -88,12 +90,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
         }
 
         if (empty($errors['phone_number']) && !empty($phone_number_form)) {
-            $stmt_check_phone = $db->prepare("SELECT user_id FROM users WHERE phone_number = :phone_number");
-            $stmt_check_phone->bindParam(':phone_number', $phone_number_form);
-            $stmt_check_phone->execute();
-            if ($stmt_check_phone->fetch()) {
-                $errors['phone_number'] = "This phone number is already in use.";
-            }
+            // Optional: Basic phone number format check if needed
+            // if (!preg_match('/^\+?\d{10,15}$/', $phone_number_form)) {
+            //     $errors['phone_number'] = "Invalid phone number format.";
+            // } else {
+                $stmt_check_phone = $db->prepare("SELECT user_id FROM users WHERE phone_number = :phone_number");
+                $stmt_check_phone->bindParam(':phone_number', $phone_number_form);
+                $stmt_check_phone->execute();
+                if ($stmt_check_phone->fetch()) {
+                    $errors['phone_number'] = "This phone number is already in use.";
+                }
+            // }
         }
 
     } catch (PDOException $e) {
@@ -151,7 +158,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
         <legend>New User Details</legend>
         <div class="form-group">
             <label for="username">Username <span style="color:red;">*</span></label>
-            <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($username_form); ?>" required>
+            <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($username_form); ?>" required maxlength="20">
             <?php if (isset($errors['username'])): ?><small style="color:red;"><?php echo $errors['username']; ?></small><?php endif; ?>
         </div>
 
@@ -163,31 +170,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
 
         <div class="form-group">
             <label for="password">Password <span style="color:red;">*</span></label>
-            <input type="password" id="password" name="password" required>
+            <input type="password" id="password" name="password" required maxlength="255">
             <?php if (isset($errors['password'])): ?><small style="color:red;"><?php echo $errors['password']; ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
             <label for="confirm_password">Confirm Password <span style="color:red;">*</span></label>
-            <input type="password" id="confirm_password" name="confirm_password" required>
+            <input type="password" id="confirm_password" name="confirm_password" required maxlength="255">
             <?php if (isset($errors['confirm_password'])): ?><small style="color:red;"><?php echo $errors['confirm_password']; ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
             <label for="first_name">First Name</label>
-            <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($first_name_form); ?>">
+            <input type="text" id="first_name" name="first_name" value="<?php echo htmlspecialchars($first_name_form); ?>" maxlength="50">
             <?php if (isset($errors['first_name'])): ?><small style="color:red;"><?php echo $errors['first_name']; ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
             <label for="last_name">Last Name</label>
-            <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($last_name_form); ?>">
+            <input type="text" id="last_name" name="last_name" value="<?php echo htmlspecialchars($last_name_form); ?>" maxlength="50">
             <?php if (isset($errors['last_name'])): ?><small style="color:red;"><?php echo $errors['last_name']; ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
             <label for="phone_number">Phone Number</label>
-            <input type="tel" id="phone_number" name="phone_number" value="<?php echo htmlspecialchars($phone_number_form); ?>">
+            <input type="tel" id="phone_number" name="phone_number" value="<?php echo htmlspecialchars($phone_number_form); ?>" maxlength="20">
             <?php if (isset($errors['phone_number'])): ?><small style="color:red;"><?php echo $errors['phone_number']; ?></small><?php endif; ?>
         </div>
 
@@ -195,7 +202,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_user'])) {
             <label for="role">Role <span style="color:red;">*</span></label>
             <select id="role" name="role" required>
                 <?php foreach ($available_roles as $role_value): ?>
-                    <option value="<?php echo $role_value; ?>" <?php echo ($role_form === $role_value) ? 'selected' : ''; ?>>
+                    <option value="<?php echo htmlspecialchars($role_value); ?>" <?php echo ($role_form === $role_value) ? 'selected' : ''; ?>>
                         <?php echo htmlspecialchars(ucfirst(str_replace('_', ' ', $role_value))); ?>
                     </option>
                 <?php endforeach; ?>

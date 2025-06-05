@@ -19,7 +19,7 @@ if (file_exists($header_path_from_public)) {
 
 $page_title = "Welcome to BaladyMall - Your Home for Local Egyptian Brands";
 
-// $db should be initialized in config.php
+// $db should be initialized in config.php, but if not, get it here.
 if (!isset($db) || !$db instanceof PDO) {
     if (function_exists('getPDOConnection')) {
         $db = getPDOConnection();
@@ -30,6 +30,7 @@ if (!isset($db) || !$db instanceof PDO) {
 }
 
 // Check for global messages passed via GET (e.g., after login)
+// Using a session flag to show messages only once per user session
 if (isset($_GET['login']) && $_GET['login'] === 'success' && isset($_SESSION['user_id'])) {
     if (!isset($_SESSION['login_success_message_shown'])) {
         echo "<div id='phpGlobalSuccessMessage' style='display:none;'>You have successfully logged in. Welcome back, " . esc_html($_SESSION['first_name'] ?? $_SESSION['username'] ?? 'User') . "!</div>";
@@ -37,10 +38,10 @@ if (isset($_GET['login']) && $_GET['login'] === 'success' && isset($_SESSION['us
     }
 }
 if (isset($_GET['logout']) && $_GET['logout'] === 'success') {
-    if (!isset($_SESSION['logout_success_message_shown'])) {
-        echo "<div id='phpGlobalSuccessMessage' style='display:none;'>You have been successfully logged out.</div>";
-        $_SESSION['logout_success_message_shown'] = true;
-    }
+    // Clear the session flag for logout so it can be shown again next time
+    unset($_SESSION['logout_success_message_shown']); // Ensures message shows on fresh logout
+    echo "<div id='phpGlobalSuccessMessage' style='display:none;'>You have been successfully logged out.</div>";
+    $_SESSION['logout_success_message_shown'] = true; // Set for current page load
 }
 if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
      if (!isset($_SESSION['registration_success_message_shown'])) {
@@ -54,13 +55,13 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
     <div class="hero-content">
         <h1 data-typing-text="Discover Authentic Egyptian Brands">Discover Authentic Egyptian Brands</h1>
         <p>Shop unique products from local artisans and businesses across Egypt. Support local, feel the pride.</p>
-        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary btn-lg">Shop All Products</a>
-        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/brands.php" class="btn btn-secondary btn-lg">Explore Brands</a>
+        <a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-primary btn-lg">Shop All Products</a>
+        <a href="<?php echo get_asset_url('brands.php'); ?>" class="btn btn-secondary btn-lg">Explore Brands</a>
     </div>
 </section>
 
 <section class="featured-categories animate-on-scroll">
-    <div class="container"> <?php // Added .container wrapper ?>
+    <div class="container">
         <h2>Featured Categories</h2>
         <?php
         $categories_html = "";
@@ -79,21 +80,37 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
 
                 if ($featured_categories) {
                     foreach ($featured_categories as $category) {
-                        $category_url = rtrim(SITE_URL, '/') . "/products.php?category_id=" . esc_html($category['category_id']);
+                        $category_url = get_asset_url("products.php?category_id=" . esc_html($category['category_id']));
                         $cat_image_path = !empty($category['category_image_url']) ? esc_html($category['category_image_url']) : '';
                         $cat_image_display_url = '';
-                        if (!empty($cat_image_path) && (strpos($cat_image_path, 'http://') === 0 || strpos($cat_image_path, 'https://') === 0)) {
-                            $cat_image_display_url = $cat_image_path;
-                        } elseif (!empty($cat_image_path) && defined('PUBLIC_UPLOADS_URL_BASE')) {
-                            $cat_image_display_url = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim($cat_image_path, '/');
+
+                        // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
+                        $fallback_image_url_esc = '';
+                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                            $fallback_image_url_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/E0E0E0/777?text=No+Image");
                         } else {
-                            $cat_image_display_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/E0E0E0/777?text=" . urlencode(esc_html($category['category_name'])) : '#';
+                            // Fallback to a local 'no-image' if placeholder generator is not defined or empty
+                            $fallback_image_url_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
                         }
-                        $cat_fallback_image_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/CCC/555?text=Error" : '#';
+
+                        // Fix: If DB stores 'categories/filename.jpg', ensure get_asset_url gets 'uploads/categories/filename.jpg'
+                        if (!empty($cat_image_path)) {
+                            if (filter_var($cat_image_path, FILTER_VALIDATE_URL)) {
+                                $cat_image_display_url = $cat_image_path;
+                            } else {
+                                // Prepends PUBLIC_ROOT_PATH equivalent. Assumes $cat_image_path starts with 'categories/' or similar.
+                                $cat_image_display_url = get_asset_url('uploads/' . ltrim($cat_image_path, '/'));
+                            }
+                        }
+
+                        // If main $cat_image_display_url is still empty, set it to the fallback
+                        if (empty($cat_image_display_url)) {
+                            $cat_image_display_url = $fallback_image_url_esc;
+                        }
 
                         $categories_html .= "<div class='category-item animate-on-scroll'>";
                         $categories_html .= "  <a href='" . $category_url . "'>";
-                        $categories_html .= "    <img src='" . $cat_image_display_url . "' alt='" . esc_html($category['category_name']) . " Category' class='rounded-md shadow-sm' onerror='this.onerror=null;this.src=\"" . $cat_fallback_image_url . "\";'>";
+                        $categories_html .= "    <img src='" . $cat_image_display_url . "' alt='" . esc_html($category['category_name']) . " Category' class='rounded-md shadow-sm' onerror='this.onerror=null;this.src=\"" . $fallback_image_url_esc . "\";'>";
                         $categories_html .= "    <h3>" . esc_html($category['category_name']) . "</h3>";
                         $categories_html .= "  </a>";
                         $categories_html .= "  <div class='item-content-wrapper'>";
@@ -120,11 +137,11 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
         }
         echo "</div>";
         ?>
-    </div> <?php // End .container wrapper ?>
+    </div>
 </section>
 
 <section class="featured-products animate-on-scroll">
-    <div class="container"> <?php // Added .container wrapper ?>
+    <div class="container">
         <h2>New Arrivals</h2>
         <?php
         $products_html = "";
@@ -144,21 +161,37 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
 
                 if ($featured_products) {
                     foreach ($featured_products as $product) {
-                        $product_url = rtrim(SITE_URL, '/') . "/product_detail.php?id=" . esc_html($product['product_id']);
+                        $product_url = get_asset_url("product_detail.php?id=" . esc_html($product['product_id']));
                         $image_path = !empty($product['main_image_url']) ? esc_html($product['main_image_url']) : '';
                         $image_url = '';
-                        if (!empty($image_path) && (strpos($image_path, 'http://') === 0 || strpos($image_path, 'https://') === 0)) {
-                            $image_url = $image_path;
-                        } elseif (!empty($image_path) && defined('PUBLIC_UPLOADS_URL_BASE')) {
-                            $image_url = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim($image_path, '/');
+
+                        // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
+                        $fallback_image_url_esc = '';
+                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                            $fallback_image_url_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/250x250/E0E0E0/777?text=No+Image");
                         } else {
-                            $image_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/250x250/F0F0F0/AAA?text=No+Image" : '#';
+                            // Fallback to a local 'no-image' if placeholder generator is not defined or empty
+                            $fallback_image_url_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
                         }
-                        $fallback_image_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/250x250/E0E0E0/777?text=Error" : '#';
+
+                        // Fix: If DB stores 'products/filename.jpg', ensure get_asset_url gets 'uploads/products/filename.jpg'
+                        if (!empty($image_path)) {
+                            if (filter_var($image_path, FILTER_VALIDATE_URL)) {
+                                $image_url = $image_path;
+                            } else {
+                                // Prepends PUBLIC_ROOT_PATH equivalent. Assumes $image_path starts with 'products/' or similar.
+                                $image_url = get_asset_url('uploads/' . ltrim($image_path, '/'));
+                            }
+                        }
+
+                        // If main $image_url is still empty, set it to the fallback
+                        if (empty($image_url)) {
+                            $image_url = $fallback_image_url_esc;
+                        }
 
                         $products_html .= "<div class='product-item animate-on-scroll'>";
                         $products_html .= "  <a href='" . $product_url . "'>";
-                        $products_html .= "    <img src='" . $image_url . "' alt='" . esc_html($product['product_name']) . "' class='rounded-md shadow-sm' onerror='this.onerror=null;this.src=\"" . $fallback_image_url . "\";'>";
+                        $products_html .= "    <img src='" . $image_url . "' alt='" . esc_html($product['product_name']) . "' class='rounded-md shadow-sm' onerror='this.onerror=null;this.src=\"" . $fallback_image_url_esc . "\";'>";
                         $products_html .= "    <h3>" . esc_html($product['product_name']) . "</h3>";
                         $products_html .= "  </a>";
                         $products_html .= "  <div class='item-content-wrapper'>";
@@ -173,7 +206,7 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
                         $products_html .= "    </div>";
                         $products_html .= "  </div>";
                         // ADDED CLASS 'ajax-add-to-cart-form'
-                        $products_html .= "  <form action='" . rtrim(SITE_URL, '/') . "/cart.php' method='POST' class='add-to-cart-form-list ajax-add-to-cart-form mt-auto'>";
+                        $products_html .= "  <form action='" . get_asset_url('cart.php') . "' method='POST' class='add-to-cart-form-list ajax-add-to-cart-form mt-auto'>";
                         $products_html .= "      <input type='hidden' name='action' value='add'>";
                         $products_html .= "      <input type='hidden' name='product_id' value='" . esc_html($product['product_id']) . "'>";
                         $products_html .= "      <input type='hidden' name='quantity' value='1'>";
@@ -198,7 +231,7 @@ if (isset($_GET['registration']) && $_GET['registration'] === 'success') {
         }
         echo "</div>";
         ?>
-    </div> <?php // End .container wrapper ?>
+    </div>
 </section>
 
 <?php

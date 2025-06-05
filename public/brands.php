@@ -6,7 +6,7 @@ $config_path_from_public = __DIR__ . '/../src/config/config.php';
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
-    die("Critical error: Main configuration file not found. Expected at: " . $config_path_from_public);
+    die("Critical error: Main configuration file not found. Expected at: " . htmlspecialchars($config_path_from_public));
 }
 
 // Include header (which will also rely on config.php)
@@ -77,25 +77,41 @@ if ($db_available) {
             <div class="product-grid">
                 <?php foreach ($brands_list as $brand): ?>
                     <?php
-                        $brand_url = rtrim(SITE_URL, '/') . "/products.php?brand_id=" . esc_html($brand['brand_id']);
+                        // Use get_asset_url for the brand specific product listing
+                        $brand_url = get_asset_url("products.php?brand_id=" . esc_html($brand['brand_id']));
 
                         $logo_path = !empty($brand['brand_logo_url']) ? esc_html($brand['brand_logo_url']) : '';
                         $logo_display_url = '';
 
-                        if (!empty($logo_path) && (strpos($logo_path, 'http://') === 0 || strpos($logo_path, 'https://') === 0)) {
-                            $logo_display_url = $logo_path;
-                        } elseif (!empty($logo_path) && defined('PUBLIC_UPLOADS_URL_BASE')) {
-                            $logo_display_url = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim($logo_path, '/');
+                        // Determine fallback logo URL and ensure it's properly escaped for the onerror attribute
+                        $fallback_logo_url_esc = '';
+                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                            $fallback_logo_url_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/CCC/777?text=Logo+Error");
                         } else {
-                            $logo_display_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/DDEEFF/555?text=" . urlencode(esc_html($brand['brand_name'])) : '#';
+                            // Fallback to a local 'no-image' if placeholder generator is not defined or empty
+                            $fallback_logo_url_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
                         }
-                        $fallback_logo_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/CCC/777?text=Logo+Error" : '#';
+
+                        // Fix: If DB stores 'brands/filename.jpg', ensure get_asset_url gets 'uploads/brands/filename.jpg'
+                        if (!empty($logo_path)) {
+                            if (filter_var($logo_path, FILTER_VALIDATE_URL)) {
+                                $logo_display_url = $logo_path;
+                            } else {
+                                // Prepends PUBLIC_ROOT_PATH equivalent. Assumes $logo_path starts with 'brands/' or similar.
+                                $logo_display_url = get_asset_url('uploads/' . ltrim($logo_path, '/'));
+                            }
+                        }
+
+                        // If main $logo_display_url is still empty, set it to the fallback
+                        if (empty($logo_display_url)) {
+                            $logo_display_url = $fallback_logo_url_esc;
+                        }
                     ?>
                     <div class="product-item animate-on-scroll">
                         <a href="<?php echo $brand_url; ?>">
                             <img src="<?php echo $logo_display_url; ?>"
                                  alt="<?php echo esc_html($brand['brand_name']); ?> Logo"
-                                 onerror="this.onerror=null;this.src='<?php echo $fallback_logo_url; ?>';"
+                                 onerror="this.onerror=null;this.src='<?php echo $fallback_logo_url_esc; ?>';"
                                  class="rounded-md shadow-sm">
                             <h3 class="product-name"><?php echo esc_html($brand['brand_name']); ?></h3>
                         </a>

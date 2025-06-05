@@ -40,11 +40,9 @@ if (session_status() == PHP_SESSION_NONE) {
 
 
 // --- Site URL and Paths ---
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-// **CRITICAL FIX: Robust PROJECT_ROOT_PATH definition**
-// This reliably points to the 'baladymall' root directory.
+// **CRITICAL FIX: Robust PROJECT_ROOT_PATH definition (filesystem path)**
+// This reliably points to the 'baladymall' root directory on the server's filesystem.
 // __FILE__ is the full path to the current file (config.php).
 // dirname(__FILE__) is 'baladymall/src/config'
 // dirname(dirname(__FILE__)) is 'baladymall/src'
@@ -53,36 +51,39 @@ if (!defined('PROJECT_ROOT_PATH')) {
     define('PROJECT_ROOT_PATH', dirname(dirname(dirname(__FILE__))));
 }
 
-// Define SITE_URL to point to the public folder, accessible via the web
+// **CRITICAL FIX: EXPLICITLY DEFINE YOUR PROJECT'S BASE URLS**
+// This bypasses any dynamic server variable issues.
+// YOU MUST SET THESE MANUALLY TO MATCH YOUR EXACT XAMPP/WEB SERVER SETUP.
+// Example: If your project is at C:\xampp\htdocs\baladymall\
+// Then PROJECT_BASE_URL should be 'http://localhost/baladymall'
+// And SITE_URL should be 'http://localhost/baladymall/public'
+if (!defined('EXPLICIT_PROJECT_BASE_URL')) {
+    define('EXPLICIT_PROJECT_BASE_URL', 'http://localhost/baladymall'); // <<-- IMPORTANT: SET THIS EXACTLY
+}
+if (!defined('EXPLICIT_SITE_URL')) {
+    define('EXPLICIT_SITE_URL', EXPLICIT_PROJECT_BASE_URL . '/public'); // Derived from above
+}
+
+
+// Define SITE_URL (web-accessible URL for the public folder)
 if (!defined('SITE_URL')) {
-    $document_root = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']); // Normalize slashes
-    $project_root_normalized = str_replace('\\', '/', PROJECT_ROOT_PATH);
+    define('SITE_URL', EXPLICIT_SITE_URL);
+}
 
-    $project_web_path_segment = '';
-    // Check if project root is directly under document root
-    if (strpos($project_root_normalized, $document_root) === 0) {
-        $project_web_path_segment = substr($project_root_normalized, strlen($document_root));
-    } else {
-        // Fallback: Attempt to guess the project's web path segment from SCRIPT_NAME
-        // This is for setups where the project folder is not directly under DOCUMENT_ROOT
-        // e.g., if DOCUMENT_ROOT is /var/www/html and project is /var/www/html/myproject
-        // or if DOCUMENT_ROOT is /var/www/html/myproject/public
-        $script_name_parts = explode('/', trim($_SERVER['SCRIPT_NAME'] ?? '', '/'));
-        $found_project_segment = '';
-        foreach ($script_name_parts as $segment) {
-            // Find the first segment that is not 'public', 'admin', or 'brand_admin'
-            if (!in_array($segment, ['public', 'admin', 'brand_admin']) && !empty($segment)) {
-                $found_project_segment = '/' . $segment;
-                break;
-            }
-        }
-        $project_web_path_segment = $found_project_segment;
-    }
-    // Ensure leading slash and no trailing slash for the segment
-    $project_web_path_segment = '/' . trim($project_web_path_segment, '/');
-    if ($project_web_path_segment === '/') $project_web_path_segment = ''; // If it resolves to just '/', make it empty
+// Define the root URL for the entire project (web-accessible, e.g., http://localhost/baladymall)
+if (!defined('PROJECT_BASE_URL')) {
+    define('PROJECT_BASE_URL', EXPLICIT_PROJECT_BASE_URL);
+}
 
-    define('SITE_URL', $protocol . $host . $project_web_path_segment . '/public');
+
+// Define specific URLs for admin and brand_admin panels
+// These are siblings to 'public', so they derive from PROJECT_BASE_URL
+// They now explicitly include /index.php for direct access.
+if (!defined('ADMIN_ROOT_URL')) {
+    define('ADMIN_ROOT_URL', rtrim(PROJECT_BASE_URL, '/') . '/admin/index.php');
+}
+if (!defined('BRAND_ADMIN_ROOT_URL')) {
+    define('BRAND_ADMIN_ROOT_URL', rtrim(PROJECT_BASE_URL, '/') . '/brand_admin/index.php');
 }
 
 
@@ -166,8 +167,10 @@ if ($_settings_db_conn instanceof PDO) {
 
     if (!defined('PLATFORM_COMMISSION_RATE')) define('PLATFORM_COMMISSION_RATE', (float)get_site_setting($_settings_db_conn, 'platform_commission_rate', '10.00'));
 
-    if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', get_site_setting($_settings_db_conn, 'site_logo_url', ''));
-    if (!defined('FAVICON_PATH')) define('FAVICON_PATH', get_site_setting($_settings_db_conn, 'favicon_url', ''));
+  // In config.php, as a temporary test if DB setting is the issue
+    if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', get_site_setting($_settings_db_conn, 'site_logo_url', SITE_URL . '/uploads/site/default_logo.png')); // Fallback from SITE_URL now available
+    if (!defined('FAVICON_PATH')) define('FAVICON_PATH', get_site_setting($_settings_db_conn, 'favicon_url', SITE_URL . '/favicon.ico')); // Fallback from SITE_URL now available
+
 
     // SMTP Configuration (from DB settings or hardcoded defaults)
     if (!defined('SMTP_HOST')) define('SMTP_HOST', get_site_setting($_settings_db_conn, 'smtp_host', 'smtp.example.com'));
@@ -191,6 +194,10 @@ if ($_settings_db_conn instanceof PDO) {
     if (!defined('SMTP_ENCRYPTION')) define('SMTP_ENCRYPTION', '');
     if (!defined('MAIL_FROM_ADDRESS')) define('MAIL_FROM_ADDRESS', 'no-reply@example.com');
     if (!defined('MAIL_FROM_NAME')) define('MAIL_FROM_NAME', 'BaladyMall');
+
+    // Fallback for logo and favicon if DB is not available
+    if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', SITE_URL . '/uploads/site/default_logo.png');
+    if (!defined('FAVICON_PATH')) define('FAVICON_PATH', SITE_URL . '/favicon.ico');
 }
 
 // --- Email Sending Function (Simulated for local, PHPMailer for production) ---
@@ -297,5 +304,19 @@ if (!defined('PLACEHOLDER_IMAGE_URL_GENERATOR')) define('PLACEHOLDER_IMAGE_URL_G
 if (!function_exists('esc_html')) {
     function esc_html($string) {
         return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
+    }
+}
+
+// Global helper function to get asset URLs, including CSS, JS, images, and general links.
+// This replaces get_site_url_for_link from footer.php and get_asset_url from header.php.
+if (!function_exists('get_asset_url')) {
+    function get_asset_url($path = '') {
+        $base_url = defined('SITE_URL') ? rtrim(SITE_URL, '/') : '';
+        // Ensure that if path starts with a slash, it's treated as relative to SITE_URL's public directory.
+        // If it's a full URL, return it as is.
+        if (filter_var($path, FILTER_VALIDATE_URL)) {
+            return $path;
+        }
+        return $base_url . '/' . ltrim($path, '/');
     }
 }

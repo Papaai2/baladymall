@@ -51,7 +51,7 @@ img {
 /* --- Header Styles --- */
 .site-header {
     background-color: #ffffff;
-    padding: 15px 0;
+    padding: 5px 0; /* Keep reduced padding */
     border-bottom: 1px solid #dee2e6;
     box-shadow: 0 2px 5px rgba(0,0,0,0.06);
     position: sticky;
@@ -59,6 +59,7 @@ img {
     z-index: 1000;
     width: 100%;
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    min-height: 105px; /* Ensure header has a fixed height that can contain the logo vertically */
 }
 
 .site-header.scrolled { /* Style for header when scrolled (JS adds this class) */
@@ -70,7 +71,7 @@ img {
 .site-header .container {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: center; /* Ensures vertical alignment */
 }
 
 .site-logo h1 {
@@ -81,6 +82,15 @@ img {
 }
 .site-logo a {
     text-decoration: none;
+}
+
+/* FIX: Style for the logo image - This will distort the logo */
+.site-logo-image {
+    height: 95px;   /* FIXED: Set the height to fill the available vertical space within the header (105px - 5px - 5px padding) */
+    width: 180px;  /* FIXED: Set a specific width. Adjust this value to control horizontal expansion. */
+                   /* WARNING: If this width is not proportional to the height of 95px, the logo WILL BE DISTORTED. */
+    display: block;
+    object-fit: fill; /* FORCES the image to fill the exact height and width, distorting if aspect ratio differs */
 }
 
 
@@ -213,10 +223,19 @@ img {
 .footer-widget ul li {
     margin-bottom: 8px; /* Reduced margin */
 }
-.footer-widget .social-media-links a svg { /* Style for SVG icons in footer */
-    transition: fill 0.2s ease-in-out;
+
+/* FIX: Moved social media link styles from header.php inline styles */
+.social-media-links a {
+    margin-right: 15px;
+    display: inline-block;
+    text-decoration: none;
 }
-.footer-widget .social-media-links a:hover svg {
+/* FIX: Moved social media SVG fill color from header.php inline styles */
+.social-media-links svg {
+    fill: #ced4da; /* Default fill color for icons */
+    transition: fill 0.2s ease-in-out; /* Keep transition for hover effect */
+}
+.social-media-links a:hover svg {
     fill: #ffffff; /* Change icon color on hover */
 }
 
@@ -1148,6 +1167,21 @@ img {
     border: 1px solid #ffeeba;
 }
 
+
+/* Form Switch Link */
+.form-switch-link {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 0.95em;
+    color: #495057;
+}
+.form-switch-link a {
+    font-weight: 600;
+    color: #007bff;
+}
+.form-switch-link a:hover {
+    color: #0056b3;
+}
 
 /* Orders Table (My Account) */
 .table-responsive {

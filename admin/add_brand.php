@@ -14,7 +14,7 @@ $admin_page_title = "Add New Brand";
 $message = '';
 $errors = [];
 
-// Posted data for sticky form
+// Posted data for sticky form - Initialized with empty string for htmlspecialchars safety
 $brand_name_form = '';
 $brand_description_form = '';
 $brand_contact_email_form = '';
@@ -49,7 +49,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
     $commission_rate_form = filter_input(INPUT_POST, 'commission_rate', FILTER_VALIDATE_FLOAT);
     $user_id_form = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT); // Brand Admin User ID
 
+    // Input Validation
     if (empty($brand_name_form)) $errors['brand_name'] = "Brand name is required.";
+    // Add max length for brand name
+    if (strlen($brand_name_form) > 255) $errors['brand_name'] = "Brand name cannot exceed 255 characters."; // Added
+
     if (empty($user_id_form)) {
         $errors['user_id'] = "A Brand Admin user must be selected.";
     } else {
@@ -60,7 +64,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
                 break;
             }
         }
-        if (!$is_valid_admin_selection && !empty($available_brand_admins)) {
+        // If not in initially loaded list, re-verify from DB in case another admin picked them.
+        // This check is a bit redundant if the primary list is correctly populated, but adds robustness.
+        if (!$is_valid_admin_selection) { // Only check if not found in available_brand_admins (which covers empty list)
             try {
                 $stmt_check_single_admin = $db->prepare("SELECT u.user_id FROM users u LEFT JOIN brands b ON u.user_id = b.user_id WHERE u.user_id = :uid AND u.role = 'brand_admin' AND b.brand_id IS NULL AND u.is_active = 1");
                 $stmt_check_single_admin->bindParam(':uid', $user_id_form, PDO::PARAM_INT);
@@ -71,8 +77,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
             } catch (PDOException $e) {
                  $errors['user_id'] = "Error validating selected Brand Admin.";
             }
-        } elseif(empty($available_brand_admins) && $user_id_form) {
-             $errors['user_id'] = "No Brand Admins available to assign. Please create or assign one first.";
         }
     }
 
@@ -81,8 +85,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
     }
     if (!empty($brand_website_url_form) && !filter_var($brand_website_url_form, FILTER_VALIDATE_URL)) {
         $errors['brand_website_url'] = "Invalid website URL format.";
+    } elseif (!empty($brand_website_url_form) && !preg_match('/^https?:\/\//i', $brand_website_url_form)) { // Ensure http/https
+         $errors['brand_website_url'] = "Website URL must start with http:// or https://."; // Added
     }
-    if ($commission_rate_form !== null && $commission_rate_form !== '' && ($commission_rate_form < 0 || $commission_rate_form > 100)) {
+
+    if ($commission_rate_form !== null && ($commission_rate_form < 0 || $commission_rate_form > 100)) {
         $errors['commission_rate'] = "Commission rate must be between 0 and 100.";
     }
 
@@ -123,7 +130,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
         }
     } elseif (isset($_FILES['brand_logo']) && $_FILES['brand_logo']['error'] != UPLOAD_ERR_NO_FILE) {
         // Handle other upload errors (e.g., UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE)
-        $errors['brand_logo'] = "Error uploading logo: " . $logo_file['error'];
+        $errors['brand_logo'] = "Error uploading logo: " . $_FILES['brand_logo']['error'];
     }
 
 
@@ -145,12 +152,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
                 $params_insert = [
                     ':user_id' => $user_id_form,
                     ':brand_name' => $brand_name_form,
-                    ':brand_logo_url' => $brand_logo_url_db_path, // NEW: Include logo URL
+                    ':brand_logo_url' => $brand_logo_url_db_path,
                     ':brand_description' => $brand_description_form ?: null,
                     ':brand_contact_email' => $brand_contact_email_form ?: null,
                     ':brand_contact_phone' => $brand_contact_phone_form ?: null,
                     ':brand_website_url' => $brand_website_url_form ?: null,
-                    ':commission_rate' => ($commission_rate_form === '' || $commission_rate_form === null) ? null : $commission_rate_form
+                    ':commission_rate' => $commission_rate_form // Can be null if it was empty input
                 ];
 
                 if ($stmt_insert->execute($params_insert)) {
@@ -160,8 +167,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
                     exit;
                 } else {
                     // If DB insert failed, delete uploaded logo to prevent orphaned files
+                    // FIX: Add check for file_exists and is_file()
                     if ($brand_logo_url_db_path && file_exists(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path)) {
-                        @unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+                        if (is_file(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path)) {
+                            unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+                        } else {
+                            error_log("Admin Add Brand - Newly uploaded logo was not a file during DB insert failure cleanup: " . PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+                        }
                     }
                     $message = "<div class='admin-message error'>Failed to add new brand.</div>";
                 }
@@ -169,8 +181,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_brand'])) {
         } catch (PDOException $e) {
             error_log("Admin Add Brand - Error inserting brand: " . $e->getMessage());
             // If DB insert failed due to exception, delete uploaded logo
+            // FIX: Add check for file_exists and is_file()
             if ($brand_logo_url_db_path && file_exists(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path)) {
-                @unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+                if (is_file(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path)) {
+                    unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+                } else {
+                    error_log("Admin Add Brand - Newly uploaded logo was not a file during DB exception cleanup: " . PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path);
+                }
             }
             if ($e->getCode() == '23000') {
                  $message = "<div class='admin-message error'>Operation failed. The brand name or assigned user might already be in use in a conflicting way.</div>";
@@ -196,7 +213,7 @@ include_once 'includes/header.php';
         <legend>Brand Details</legend>
         <div class="form-group">
             <label for="brand_name">Brand Name <span style="color:red;">*</span></label>
-            <input type="text" id="brand_name" name="brand_name" value="<?php echo htmlspecialchars($brand_name_form); ?>" required>
+            <input type="text" id="brand_name" name="brand_name" value="<?php echo htmlspecialchars($brand_name_form); ?>" required maxlength="255">
             <?php if (isset($errors['brand_name'])): ?><small style="color:red;"><?php echo $errors['brand_name']; ?></small><?php endif; ?>
         </div>
 
@@ -239,7 +256,7 @@ include_once 'includes/header.php';
                 <option value="">-- Select a Brand Admin --</option>
                 <?php if (!empty($available_brand_admins)): ?>
                     <?php foreach ($available_brand_admins as $admin): ?>
-                        <option value="<?php echo $admin['user_id']; ?>" <?php echo ($user_id_form == $admin['user_id']) ? 'selected' : ''; ?>>
+                        <option value="<?php echo htmlspecialchars($admin['user_id']); ?>" <?php echo ((string)$user_id_form === (string)$admin['user_id']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($admin['username'] . ' (' . trim($admin['first_name'] . ' ' . $admin['last_name']) . ')'); ?>
                         </option>
                     <?php endforeach; ?>

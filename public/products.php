@@ -6,7 +6,7 @@ $config_path_from_public = __DIR__ . '/../src/config/config.php';
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
-    die("Critical error: Main configuration file not found. Expected at: " . $config_path_from_public);
+    die("Critical error: Main configuration file not found. Expected at: " . htmlspecialchars($config_path_from_public));
 }
 
 // Include header (which will also rely on config.php)
@@ -30,16 +30,19 @@ $filter_category_id = null;
 if (isset($_GET['category_id']) && is_numeric($_GET['category_id'])) {
     $filter_category_id = (int)$_GET['category_id'];
     // Try to fetch category name for title display
-    try {
-        $stmt_cat = $db->prepare("SELECT category_name FROM categories WHERE category_id = ?");
-        $stmt_cat->execute([$filter_category_id]);
-        $cat_result = $stmt_cat->fetch(PDO::FETCH_ASSOC);
-        if ($cat_result) {
-            $category_name = esc_html($cat_result['category_name']);
-            $page_title = $category_name . " Products - BaladyMall";
+    if ($db) { // Check DB connection before query
+        try {
+            $stmt_cat = $db->prepare("SELECT category_name FROM categories WHERE category_id = ?");
+            $stmt_cat->execute([$filter_category_id]);
+            $cat_result = $stmt_cat->fetch(PDO::FETCH_ASSOC);
+            if ($cat_result) {
+                $category_name = esc_html($cat_result['category_name']);
+                $page_title = $category_name . " Products - BaladyMall";
+            }
+        } catch (PDOException $e) {
+            error_log("Error fetching category name: " . $e->getMessage());
+            // This error doesn't stop page render, just means category name might be missing
         }
-    } catch (PDOException $e) {
-        error_log("Error fetching category name: " . $e->getMessage());
     }
 }
 
@@ -48,66 +51,72 @@ $filter_brand_id = null;
 if (isset($_GET['brand_id']) && is_numeric($_GET['brand_id'])) {
     $filter_brand_id = (int)$_GET['brand_id'];
     // Try to fetch brand name for title display
-    try {
-        $stmt_brand = $db->prepare("SELECT brand_name FROM brands WHERE brand_id = ?");
-        $stmt_brand->execute([$filter_brand_id]);
-        $brand_result = $stmt_brand->fetch(PDO::FETCH_ASSOC);
-        if ($brand_result) {
-            $brand_name = esc_html($brand_result['brand_name']);
-            $page_title = $brand_name . " Products - BaladyMall";
+    if ($db) { // Check DB connection before query
+        try {
+            $stmt_brand = $db->prepare("SELECT brand_name FROM brands WHERE brand_id = ?");
+            $stmt_brand->execute([$filter_brand_id]);
+            $brand_result = $stmt_brand->fetch(PDO::FETCH_ASSOC);
+            if ($brand_result) {
+                $brand_name = esc_html($brand_result['brand_name']);
+                $page_title = $brand_name . " Products - BaladyMall";
+            }
+        } catch (PDOException $e) {
+            error_log("Error fetching brand name: " . $e->getMessage());
+            // This error doesn't stop page render, just means brand name might be missing
         }
-    } catch (PDOException $e) {
-        error_log("Error fetching brand name: " . $e->getMessage());
     }
 }
 
+if ($db) { // Proceed with fetching products only if DB connection is available
+    try {
+        // Base SQL query
+        $sql = "
+            SELECT
+                p.product_id,
+                p.product_name,
+                p.price,
+                p.compare_at_price,
+                p.main_image_url,
+                b.brand_name
+            FROM products p
+            JOIN brands b ON p.brand_id = b.brand_id
+        ";
 
-try {
-    // Base SQL query
-    $sql = "
-        SELECT
-            p.product_id,
-            p.product_name,
-            p.price,
-            p.compare_at_price,
-            p.main_image_url,
-            b.brand_name
-        FROM products p
-        JOIN brands b ON p.brand_id = b.brand_id
-    ";
+        $conditions = ["p.is_active = 1", "b.is_approved = 1"]; // Default conditions
+        $params = []; // Parameters for prepared statement
 
-    $conditions = ["p.is_active = 1", "b.is_approved = 1"]; // Default conditions
-    $params = []; // Parameters for prepared statement
+        // If filtering by category, add JOIN and WHERE clause
+        if ($filter_category_id !== null) {
+            $sql .= " JOIN product_category pc ON p.product_id = pc.product_id ";
+            $conditions[] = "pc.category_id = ?";
+            $params[] = $filter_category_id;
+        }
 
-    // If filtering by category, add JOIN and WHERE clause
-    if ($filter_category_id !== null) {
-        $sql .= " JOIN product_category pc ON p.product_id = pc.product_id ";
-        $conditions[] = "pc.category_id = ?";
-        $params[] = $filter_category_id;
+        // If filtering by brand, add WHERE clause
+        if ($filter_brand_id !== null) {
+            $conditions[] = "p.brand_id = ?";
+            $params[] = $filter_brand_id;
+        }
+
+        // Append all conditions to the SQL query
+        if (!empty($conditions)) {
+            $sql .= " WHERE " . implode(" AND ", $conditions);
+        }
+
+        $sql .= " ORDER BY p.created_at DESC"; // Order by newest first
+
+        // Prepare and execute the statement
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+
+        $all_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } catch (PDOException $e) {
+        error_log("Error fetching products: " . $e->getMessage());
+        $page_error_message = "Sorry, we couldn't load the products at this time. Please try again later.";
     }
-
-    // If filtering by brand, add WHERE clause
-    if ($filter_brand_id !== null) {
-        $conditions[] = "p.brand_id = ?";
-        $params[] = $filter_brand_id;
-    }
-
-    // Append all conditions to the SQL query
-    if (!empty($conditions)) {
-        $sql .= " WHERE " . implode(" AND ", $conditions);
-    }
-
-    $sql .= " ORDER BY p.created_at DESC"; // Order by newest first
-
-    // Prepare and execute the statement
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
-
-    $all_products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-    error_log("Error fetching products: " . $e->getMessage());
-    $page_error_message = "Sorry, we couldn't load the products at this time. Please try again later.";
+} else {
+    $page_error_message = "Database connection is not available. Cannot display products.";
 }
 
 ?>
@@ -128,7 +137,7 @@ try {
 
         <?php if (!empty($page_error_message)): ?>
             <div class="form-message error-message">
-                <?php echo htmlspecialchars($page_error_message); ?>
+                <?php echo esc_html($page_error_message); ?>
             </div>
         <?php endif; ?>
 
@@ -142,32 +151,48 @@ try {
             <div class="product-grid">
                 <?php foreach ($all_products as $product): ?>
                     <?php
-                        $product_url = rtrim(SITE_URL, '/') . "/product_detail.php?id=" . htmlspecialchars($product['product_id']);
-                        $image_path = !empty($product['main_image_url']) ? htmlspecialchars($product['main_image_url']) : '';
+                        // Use get_asset_url for product detail link
+                        $product_url = get_asset_url("product_detail.php?id=" . esc_html($product['product_id']));
+                        $image_path = !empty($product['main_image_url']) ? esc_html($product['main_image_url']) : '';
 
                         $image_url = '';
+                        $fallback_image_url_esc = '';
 
-                        if (!empty($image_path) && (strpos($image_path, 'http://') === 0 || strpos($image_path, 'https://') === 0)) {
-                            $image_url = $image_path;
-                        } elseif (!empty($image_path) && defined('PUBLIC_UPLOADS_URL_BASE')) {
-                            $image_url = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim($image_path, '/');
-                        } else {
-                            $image_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x300/F0F0F0/AAA?text=No+Image" : 'https://placehold.co/300x300/F0F0F0/AAA?text=No+Image';
+                        // Use get_asset_url for image paths
+                        if (!empty($image_path)) {
+                            if (filter_var($image_path, FILTER_VALIDATE_URL)) {
+                                $image_url = $image_path;
+                            } else {
+                                $image_url = get_asset_url('uploads/products/' . ltrim($image_path, '/'));
+                            }
                         }
-                        $fallback_image_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x300/E0E0E0/777?text=Image+Error" : 'https://placehold.co/300x300/E0E0E0/777?text=Image+Error';
+
+                        // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
+                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                            $fallback_image_url_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x300/E0E0E0/777?text=No+Image");
+                        } else {
+                            // Fallback to a local 'no-image' if placeholder generator is not defined or empty
+                            // Ensure you have a 'no-image.png' in your 'public/images/' directory
+                            $fallback_image_url_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
+                        }
+
+                        // If main $image_url is still empty, set it to the fallback
+                        if (empty($image_url)) {
+                            $image_url = $fallback_image_url_esc;
+                        }
                     ?>
                     <div class="product-item animate-on-scroll">
                         <a href="<?php echo $product_url; ?>" class="product-item-link">
                             <div class="product-image-container">
                                 <img src="<?php echo $image_url; ?>"
-                                     alt="<?php echo htmlspecialchars($product['product_name']); ?>"
+                                     alt="<?php echo esc_html($product['product_name']); ?>"
                                      class="rounded-md shadow-sm product-image"
-                                     onerror="this.onerror=null;this.src='<?php echo $fallback_image_url; ?>';">
+                                     onerror="this.onerror=null;this.src='<?php echo $fallback_image_url_esc; ?>';">
                             </div>
-                            <h3 class="product-name"><?php echo htmlspecialchars($product['product_name']); ?></h3>
+                            <h3 class="product-name"><?php echo esc_html($product['product_name']); ?></h3>
                         </a>
                         <div class="item-content-wrapper">
-                            <p class="product-brand"><?php echo htmlspecialchars($product['brand_name']); ?></p>
+                            <p class="product-brand"><?php echo esc_html($product['brand_name']); ?></p>
                             <div class="price-container">
                                 <?php
                                 if (!empty($product['compare_at_price']) && $product['compare_at_price'] > 0 && $product['compare_at_price'] > $product['price']):
@@ -180,9 +205,9 @@ try {
                             </div>
                         </div>
                         <div class="product-actions mt-auto">
-                            <form action="<?php echo rtrim(SITE_URL, '/') . "/cart.php"; ?>" method="POST" class="add-to-cart-form-list ajax-add-to-cart-form">
+                            <form action="<?php echo get_asset_url("cart.php"); ?>" method="POST" class="add-to-cart-form-list ajax-add-to-cart-form">
                                 <input type="hidden" name="action" value="add">
-                                <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($product['product_id']); ?>">
+                                <input type="hidden" name="product_id" value="<?php echo esc_html($product['product_id']); ?>">
                                 <input type="hidden" name="quantity" value="1">
                                 <button type="submit" class="btn btn-sm btn-add-to-cart">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cart-plus" viewBox="0 0 16 16" style="margin-right: 5px; vertical-align: text-bottom;">

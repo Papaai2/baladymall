@@ -31,14 +31,15 @@ if (file_exists($header_path)) {
 
 // Authentication Check: Ensure user is logged in
 if (!isset($_SESSION['user_id'])) {
-    $_SESSION['redirect_after_login'] = rtrim(SITE_URL, '/') . "/my_account.php"; // Store current page
-    header("Location: " . rtrim(SITE_URL, '/') . "/login.php?auth=required&target=my_account");
+    // Use get_asset_url for the redirect path
+    $_SESSION['redirect_after_login'] = get_asset_url("my_account.php"); // Store current page
+    header("Location: " . get_asset_url("login.php?auth=required&target=my_account"));
     exit;
 }
 
 // Ensure $db is available
 if (!isset($db) || !$db instanceof PDO) {
-    if (function_exists('getPDOConnection')) {
+    if (function_exists('getPDOConnection')) { // Safely call getPDOConnection
         $db = getPDOConnection();
     }
     if (!isset($db) || !$db instanceof PDO) {
@@ -99,6 +100,14 @@ if (isset($db) && $db instanceof PDO) { // Proceed only if DB connection is avai
                 $current_shipping_governorate = $user_address_data['shipping_governorate'] ?? '';
                 $current_shipping_postal_code = $user_address_data['shipping_postal_code'] ?? '';
                 $current_shipping_country = $user_address_data['shipping_country'] ?? 'Egypt';
+            } else {
+                // Initialize if no address data found
+                $current_shipping_address_line1 = '';
+                $current_shipping_address_line2 = '';
+                $current_shipping_city = '';
+                $current_shipping_governorate = '';
+                $current_shipping_postal_code = '';
+                $current_shipping_country = 'Egypt';
             }
         } catch (PDOException $e) {
             error_log("My Account - Error fetching shipping address: " . $e->getMessage());
@@ -137,12 +146,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($db) && $db instanceof PDO) {
         elseif (!preg_match('/^\+?[0-9\s\-()]{7,20}$/', $new_phone_number)) { $profile_errors['phone_number'] = "Invalid phone number format.";}
 
         if (empty($profile_errors)) {
+            // Check if email or phone number is already in use by another user
             if ($new_email !== $current_email) {
                 $stmt_check_email = $db->prepare("SELECT user_id FROM users WHERE email = :email AND user_id != :user_id LIMIT 1");
                 $stmt_check_email->execute([':email' => $new_email, ':user_id' => $user_id]);
                 if ($stmt_check_email->fetch()) $profile_errors['email'] = "This email address is already in use by another account.";
             }
-            if ($new_phone_number !== $current_phone_number && !empty($new_phone_number) ) { 
+            if (!empty($new_phone_number) && $new_phone_number !== $current_phone_number) { // Only check if phone number changed and is not empty
                  $stmt_check_phone = $db->prepare("SELECT user_id FROM users WHERE phone_number = :phone_number AND user_id != :user_id LIMIT 1");
                 $stmt_check_phone->execute([':phone_number' => $new_phone_number, ':user_id' => $user_id]);
                 if ($stmt_check_phone->fetch()) $profile_errors['phone_number'] = "This phone number is already in use by another account.";
@@ -153,17 +163,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($db) && $db instanceof PDO) {
             try {
                 $update_sql = "UPDATE users SET first_name = :first_name, last_name = :last_name, email = :email, phone_number = :phone_number, updated_at = CURRENT_TIMESTAMP WHERE user_id = :user_id";
                 $stmt_update = $db->prepare($update_sql);
-                $stmt_update->execute([':first_name' => $new_first_name, ':last_name' => $new_last_name, ':email' => $new_email, ':phone_number' => $new_phone_number, ':user_id' => $user_id]);
+                $stmt_update->execute([
+                    ':first_name' => $new_first_name,
+                    ':last_name' => $new_last_name,
+                    ':email' => $new_email,
+                    ':phone_number' => $new_phone_number,
+                    ':user_id' => $user_id
+                ]);
                 
-                $_SESSION['first_name'] = $new_first_name; $_SESSION['last_name'] = $new_last_name; $_SESSION['email'] = $new_email; $_SESSION['phone_number'] = $new_phone_number;
+                // Update session variables immediately
+                $_SESSION['first_name'] = $new_first_name;
+                $_SESSION['last_name'] = $new_last_name;
+                $_SESSION['email'] = $new_email;
+                $_SESSION['phone_number'] = $new_phone_number;
                 
-                $current_first_name = $new_first_name; $current_last_name = $new_last_name; $current_email = $new_email; $current_phone_number = $new_phone_number;
+                // Update current variables for immediate display on the page without re-fetch
+                $current_first_name = $new_first_name;
+                $current_last_name = $new_last_name;
+                $current_email = $new_email;
+                $current_phone_number = $new_phone_number;
                 $full_name = esc_html(trim($current_first_name . ' ' . $current_last_name));
                 if (empty(trim($full_name))) { $full_name = esc_html($current_username); }
+
                 $profile_success_message = "Your profile has been updated successfully!";
             } catch (PDOException $e) {
                 error_log("Profile Update Error (User ID: {$user_id}): " . $e->getMessage());
-                $profile_errors['form'] = ($e->getCode() == '23000') ? "The email or phone number you entered is already in use." : "An error occurred while updating your profile.";
+                // Generic message, unique constraint check already handled more specifically
+                $profile_errors['form'] = "An error occurred while updating your profile. Please try again.";
             }
         }
     } elseif (isset($_POST['change_password_submit'])) {
@@ -224,13 +250,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($db) && $db instanceof PDO) {
                                       WHERE user_id = :user_id";
                 $stmt_update_address = $db->prepare($update_address_sql);
                 $stmt_update_address->execute([
-                    ':addr1' => $new_shipping_address_line1, ':addr2' => $new_shipping_address_line2,
-                    ':city' => $new_shipping_city, ':gov' => $new_shipping_governorate,
-                    ':zip' => $new_shipping_postal_code, ':country' => $new_shipping_country,
+                    ':addr1' => $new_shipping_address_line1,
+                    ':addr2' => $new_shipping_address_line2,
+                    ':city' => $new_shipping_city,
+                    ':gov' => $new_shipping_governorate,
+                    ':zip' => $new_shipping_postal_code,
+                    ':country' => $new_shipping_country,
                     ':user_id' => $user_id
                 ]);
 
-                // No need to check rowCount strictly for UPDATE success, execute() throws exception on failure with ATTR_ERRMODE_EXCEPTION
                 $address_success_message = "Your shipping address has been updated successfully!";
                 // Update current variables for immediate display
                 $current_shipping_address_line1 = $new_shipping_address_line1;
@@ -254,22 +282,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($db) && $db instanceof PDO) {
         <div class="sidebar-header"><h4>Account Navigation</h4></div>
         <nav class="sidebar-nav">
             <ul>
-                <li class="nav-item <?php echo ($view == 'dashboard') ? 'active' : ''; ?>"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=dashboard" class="nav-link">Dashboard</a></li>
-                <li class="nav-item <?php echo ($view == 'orders') ? 'active' : ''; ?>"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=orders" class="nav-link">Order History</a></li>
-                <li class="nav-item <?php echo ($view == 'profile') ? 'active' : ''; ?>"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=profile" class="nav-link">My Details</a></li>
-                <li class="nav-item <?php echo ($view == 'addresses') ? 'active' : ''; ?>"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=addresses" class="nav-link">Shipping Addresses</a></li>
-                <li class="nav-item <?php echo ($view == 'change_password') ? 'active' : ''; ?>"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/my_account.php?view=change_password" class="nav-link">Change Password</a></li>
+                <li class="nav-item <?php echo ($view == 'dashboard') ? 'active' : ''; ?>"><a href="<?php echo get_asset_url('my_account.php?view=dashboard'); ?>" class="nav-link">Dashboard</a></li>
+                <li class="nav-item <?php echo ($view == 'orders') ? 'active' : ''; ?>"><a href="<?php echo get_asset_url('my_account.php?view=orders'); ?>" class="nav-link">Order History</a></li>
+                <li class="nav-item <?php echo ($view == 'profile') ? 'active' : ''; ?>"><a href="<?php echo get_asset_url('my_account.php?view=profile'); ?>" class="nav-link">My Details</a></li>
+                <li class="nav-item <?php echo ($view == 'addresses') ? 'active' : ''; ?>"><a href="<?php echo get_asset_url('my_account.php?view=addresses'); ?>" class="nav-link">Shipping Addresses</a></li>
+                <li class="nav-item <?php echo ($view == 'change_password') ? 'active' : ''; ?>"><a href="<?php echo get_asset_url('my_account.php?view=change_password'); ?>" class="nav-link">Change Password</a></li>
                 
                 <?php if ($current_role === 'brand_admin'): ?>
                     <li class="nav-item separator"><hr></li>
-                    <li class="nav-item"><a href="<?php echo (defined('BRAND_ADMIN_URL') ? BRAND_ADMIN_URL : rtrim(SITE_URL, '/') . "/../brand_admin/index.php"); ?>" class="nav-link btn btn-info btn-sm" style="color:white;">Brand Dashboard</a></li>
+                    <li class="nav-item">
+                        <a href="<?php echo BRAND_ADMIN_ROOT_URL; ?>" class="nav-link btn btn-info btn-sm" style="color:white;">Brand Dashboard</a>
+                    </li>
                 <?php elseif ($current_role === 'super_admin'): ?>
                     <li class="nav-item separator"><hr></li>
-                    <li class="nav-item"><a href="<?php echo (defined('SUPER_ADMIN_URL') ? SUPER_ADMIN_URL : rtrim(SITE_URL, '/') . "/../admin/index.php"); ?>" class="nav-link btn btn-warning btn-sm" style="color:#212529;">Super Admin Panel</a></li>
+                    <li class="nav-item">
+                        <a href="<?php echo ADMIN_ROOT_URL; ?>" class="nav-link btn btn-warning btn-sm" style="color:#212529;">Super Admin Panel</a>
+                    </li>
                 <?php endif; ?>
                 
                 <li class="nav-item separator"><hr></li>
-                <li class="nav-item"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/logout.php" class="nav-link logout-link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-right" viewBox="0 0 16 16" style="margin-right: 8px; vertical-align: text-bottom;"><path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/><path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/></svg>Logout</a></li>
+                <li class="nav-item"><a href="<?php echo get_asset_url('logout.php'); ?>" class="nav-link logout-link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-right" viewBox="0 0 16 16" style="margin-right: 8px; vertical-align: text-bottom;"><path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/><path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/></svg>Logout</a></li>
             </ul>
         </nav>
     </aside>
@@ -321,7 +353,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($db) && $db instanceof PDO) {
                                 echo "<td>" . esc_html(date("F j, Y, g:i a", strtotime($order['order_date']))) . "</td>";
                                 echo "<td>" . CURRENCY_SYMBOL . esc_html(number_format($order['total_amount'], 2)) . "</td>";
                                 echo "<td>" . esc_html(ucfirst(str_replace('_', ' ', $order['order_status']))) . "</td>";
-                                echo "<td><a href='" . rtrim(SITE_URL, '/') . "/order_detail.php?order_id=" . esc_html($order['order_id']) . "' class='btn btn-sm btn-secondary'>View Details</a></td>";
+                                echo "<td><a href='" . get_asset_url("order_detail.php?order_id=" . esc_html($order['order_id']) . "&_public=true") . "' class='btn btn-sm btn-secondary'>View Details</a></td>"; // Added _public=true to distinguish it's public order_detail
                                 echo "</tr>";
                             }
                             echo "</tbody>";
@@ -444,10 +476,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($db) && $db instanceof PDO) {
                     echo "<h3>Account Overview</h3>";
                     echo "<p>From your account dashboard, you can view your recent activity, manage your orders, and update your account details.</p>";
                     echo "<div class='dashboard-widgets'>";
-                    echo "<div class='widget'><a href='" . rtrim(SITE_URL, '/') . "/my_account.php?view=orders'><h4>Recent Orders</h4><p>View your latest orders</p></a></div>";
-                    echo "<div class='widget'><a href='" . rtrim(SITE_URL, '/') . "/my_account.php?view=profile'><h4>Account Details</h4><p>Update your information</p></a></div>";
-                    echo "<div class='widget'><a href='" . rtrim(SITE_URL, '/') . "/my_account.php?view=addresses'><h4>Shipping Addresses</h4><p>Manage addresses</p></a></div>";
-                    echo "<div class='widget'><a href='" . rtrim(SITE_URL, '/') . "/my_account.php?view=change_password'><h4>Security</h4><p>Change your password</p></a></div>";
+                    echo "<div class='widget'><a href='" . get_asset_url('my_account.php?view=orders') . "'><h4>Recent Orders</h4><p>View your latest orders</p></a></div>";
+                    echo "<div class='widget'><a href='" . get_asset_url('my_account.php?view=profile') . "'><h4>Account Details</h4><p>Update your information</p></a></div>";
+                    echo "<div class='widget'><a href='" . get_asset_url('my_account.php?view=addresses') . "'><h4>Shipping Addresses</h4><p>Manage addresses</p></a></div>";
+                    echo "<div class='widget'><a href='" . get_asset_url('my_account.php?view=change_password') . "'><h4>Security</h4><p>Change your password</p></a></div>";
                     echo "</div>";
                     break;
             }

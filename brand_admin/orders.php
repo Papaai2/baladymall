@@ -67,21 +67,23 @@ $sql_orders .= " ORDER BY o.order_date DESC LIMIT :limit OFFSET :offset";
 $total_records = 0;
 try {
     $stmt_count = $db->prepare($sql_count);
-    $stmt_count->execute($params);
+    $stmt_count->execute($params); // Pass params for count query as well
     $total_records = (int)$stmt_count->fetchColumn();
 } catch (PDOException $e) {
     error_log("Brand Admin Orders - Error fetching order count for brand {$current_brand_id}: " . $e->getMessage());
-    echo "<div class='brand-admin-message error'>Error fetching order count.</div>";
+    // FIX: Removed raw error message from display
+    echo "<div class='brand-admin-message error'>Error fetching order count. Please try again later.</div>";
 }
 $total_pages = ceil($total_records / $records_per_page);
 
 // --- Fetch Orders for Current Page ---
 $orders = [];
-if ($total_records > 0 || empty($where_clauses)) {
+// FIX: Only attempt to fetch if there's a chance of records or if no specific filters are applied to prevent empty results if db query failed
+if ($total_records > 0 || (empty($params) && empty($where_clauses))) { // If no filters and count is 0, still show empty table
     try {
         $stmt_orders = $db->prepare($sql_orders);
         foreach ($params as $key => $val) {
-            $stmt_orders->bindValue($key, $val);
+            $stmt_orders->bindValue($key, $val, is_int($val) ? PDO::PARAM_INT : PDO::PARAM_STR); // FIX: Explicit bindValue type
         }
         $stmt_orders->bindParam(':limit', $records_per_page, PDO::PARAM_INT);
         $stmt_orders->bindParam(':offset', $offset, PDO::PARAM_INT);
@@ -89,7 +91,8 @@ if ($total_records > 0 || empty($where_clauses)) {
         $orders = $stmt_orders->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         error_log("Brand Admin Orders - Error fetching orders for brand {$current_brand_id}: " . $e->getMessage());
-        echo "<div class='brand-admin-message error'>Error fetching orders. Details: " . $e->getMessage() . "</div>";
+        // FIX: Removed raw error message from display
+        echo "<div class='brand-admin-message error'>Error fetching orders. Please try again later.</div>";
     }
 }
 
@@ -107,15 +110,13 @@ if (isset($_SESSION['brand_admin_message'])) {
 }
 ?>
 
-<!-- Filter Form -->
 <div class="brand-admin-filters">
     <form action="orders.php" method="GET">
         <label for="filter_status">Filter by Status:</label>
         <select name="filter_status" id="filter_status">
             <option value="">-- All Statuses --</option>
             <?php foreach ($order_statuses_available as $status_val): ?>
-                <option value="<?php echo htmlspecialchars($status_val); ?>" <?php echo ($filter_status == $status_val) ? 'selected' : ''; ?>>
-                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $status_val))); ?>
+                <option value="<?php echo htmlspecialchars($status_val); ?>" <?php echo ((string)$filter_status === (string)$status_val) ? 'selected' : ''; ?>> <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $status_val))); ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -146,18 +147,17 @@ if (isset($_SESSION['brand_admin_message'])) {
                 <tr>
                     <td>#<?php echo htmlspecialchars($order['order_id']); ?></td>
                     <td>
-                        <?php echo htmlspecialchars(trim($order['customer_full_name']) ?: $order['customer_username']); ?>
-                        (ID: <?php echo htmlspecialchars($order['customer_user_id']); ?>)
+                        <?php echo htmlspecialchars(trim(($order['customer_full_name'] ?? '') ?: ($order['customer_username'] ?? 'N/A'))); ?> (ID: <?php echo htmlspecialchars($order['customer_user_id'] ?? 'N/A'); ?>)
                     </td>
                     <td><?php echo htmlspecialchars(date("M j, Y, g:i a", strtotime($order['order_date']))); ?></td>
-                    <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
+                    <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
                     <td>
                         <span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $order['order_status']))); ?>">
                             <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $order['order_status']))); ?>
                         </span>
                     </td>
                     <td class="actions">
-                        <a href="order_detail.php?order_id=<?php echo $order['order_id']; ?>" class="btn-view">View Details</a>
+                        <a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>" class="btn-view">View Details</a>
                         <?php // Add more actions like 'Update Status' if needed directly here or on detail page ?>
                     </td>
                 </tr>
@@ -165,7 +165,6 @@ if (isset($_SESSION['brand_admin_message'])) {
         </tbody>
     </table>
 
-    <!-- Pagination Links -->
     <?php if ($total_pages > 1): ?>
         <div class="pagination" style="margin-top: 20px; text-align: center;">
             <?php
@@ -176,24 +175,24 @@ if (isset($_SESSION['brand_admin_message'])) {
                 $pagination_query_string = http_build_query($pagination_query_params);
             ?>
             <?php if ($page > 1): ?>
-                <a href="?page=<?php echo $page - 1; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">&laquo; Previous</a>
+                <a href="?page=<?php echo htmlspecialchars($page - 1); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">&laquo; Previous</a>
             <?php endif; ?>
 
             <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                <a href="?page=<?php echo $i; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px; <?php if ($i == $page) echo 'background-color: #3f51b5; color: white;'; ?>">
-                    <?php echo $i; ?>
+                <a href="?page=<?php echo htmlspecialchars($i); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px; <?php if ($i == $page) echo 'background-color: #3f51b5; color: white;'; ?>">
+                    <?php echo htmlspecialchars($i); ?>
                 </a>
             <?php endfor; ?>
 
             <?php if ($page < $total_pages): ?>
-                <a href="?page=<?php echo $page + 1; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">Next &raquo;</a>
+                <a href="?page=<?php echo htmlspecialchars($page + 1); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">Next &raquo;</a>
             <?php endif; ?>
         </div>
     <?php endif; ?>
 
-<?php elseif (empty($params) && $total_records == 0): ?>
+<?php elseif ($total_records == 0 && empty($search_order_id) && empty($filter_status)): // Only show "No orders yet" if no filters applied. ?>
     <p class="brand-admin-message info">No orders found for your brand yet.</p>
-<?php else: ?>
+<?php else: // Show "No orders found matching filters" if filters applied but no results ?>
      <p class="brand-admin-message info">No orders found matching your current filters.</p>
 <?php endif; ?>
 

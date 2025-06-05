@@ -54,7 +54,7 @@ try {
         header("Location: orders.php");
         exit;
     }
-    $brand_admin_page_title = "Details for Order #" . htmlspecialchars($order['order_id']);
+    $brand_admin_page_title = "Details for Order #" . htmlspecialchars($order['order_id'] ?? 'N/A'); // FIX: Coalesce for htmlspecialchars
 
     // Fetch customer data (no brand filter needed here, as order itself is filtered)
     $stmt_customer = $db->prepare("SELECT user_id, username, email, first_name, last_name, phone_number FROM users WHERE user_id = :customer_id");
@@ -83,7 +83,7 @@ try {
 
 } catch (PDOException $e) {
     error_log("Brand Admin Order Detail - Error fetching order data for ID {$order_id} and brand {$current_brand_id}: " . $e->getMessage());
-    $message = "<div class='brand-admin-message error'>Could not load order details. " . $e->getMessage() . "</div>";
+    $message = "<div class='brand-admin-message error'>Could not load order details.</div>"; // FIX: Removed raw error message
 }
 
 // --- Handle Order Item Status Update ---
@@ -144,11 +144,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_item_status'])
                         $customer_email_body .= "The status of one of your items in order #{$order_id} has been updated:\n\n";
                         $customer_email_body .= "Product: " . htmlspecialchars($product_name_for_email) . " (x{$item_quantity_for_email})\n";
                         $customer_email_body .= "New Status: " . htmlspecialchars(ucwords(str_replace('_', ' ', $new_item_status))) . "\n\n";
-                        $customer_email_body .= "You can view your full order details here: " . rtrim(SITE_URL, '/') . "/order_detail.php?order_id=" . $order_id . "\n\n";
-                        $customer_email_body .= "Regards,\n" . SITE_NAME . " Team";
+                        $customer_email_body .= "You can view your full order details here: " . rtrim(SITE_URL, '/') . "/order_detail.php?order_id=" . htmlspecialchars($order_id) . "\n\n"; // FIX: htmlspecialchars for order_id in URL
+                        $customer_email_body .= "Regards,\n" . htmlspecialchars(SITE_NAME) . " Team"; // FIX: htmlspecialchars for SITE_NAME
 
                         // Placeholder for actual email sending
-                        error_log("CUSTOMER ITEM STATUS UPDATE EMAIL for {$order['customer_email']} (Order #{$order_id}, Item #{$order_item_id_to_update}):\nSubject: {$customer_email_subject}\nBody:\n{$customer_email_body}\n");
+                        // Using send_email function from config.php if defined
+                        if (function_exists('send_email')) {
+                            send_email($order['customer_email'], $customer_email_subject, $customer_email_body);
+                        } else {
+                            error_log("CUSTOMER ITEM STATUS UPDATE EMAIL (send_email function not found) for {$order['customer_email']} (Order #{$order_id}, Item #{$order_item_id_to_update}):\nSubject: {$customer_email_subject}\nBody:\n{$customer_email_body}\n");
+                        }
                     }
                     // --- End Customer Notification Email ---
 
@@ -222,18 +227,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_item_status'])
                     $_SESSION['brand_admin_message'] = "<div class='brand-admin-message warning'>Order item #{$order_item_id_to_update} status was already '" . htmlspecialchars(ucwords(str_replace('_', ' ', $new_item_status))) . "' or could not be updated.</div>";
                 }
                 // Redirect to refresh the page and show updated status
-                header("Location: order_detail.php?order_id={$order_id}");
+                header("Location: order_detail.php?order_id=".htmlspecialchars($order_id)); // FIX: htmlspecialchars
                 exit;
             } else {
                 $message = "<div class='brand-admin-message error'>Failed to update order item status. Database operation failed.</div>";
             }
         } catch (PDOException $e) {
             error_log("Brand Admin Order Detail - Error updating item status for order item ID {$order_item_id_to_update}: " . $e->getMessage());
-            $message = "<div class='brand-admin-message error'>Database error updating item status: " . $e->getMessage() . "</div>";
+            $message = "<div class='brand-admin-message error'>Database error updating item status.</div>"; // FIX: Removed raw error message
         }
     } else {
         $error_message_text = "<ul>";
-        foreach($errors as $err) { $error_message_text .= "<li>{$err}</li>"; }
+        foreach($errors as $err) { $error_message_text .= "<li>" . htmlspecialchars($err) . "</li>"; } // FIX: htmlspecialchars
         $error_message_text .= "</ul>";
         $message = "<div class='brand-admin-message error'>{$error_message_text}</div>";
     }
@@ -263,18 +268,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_internal_notes']
 
             if ($stmt_update_notes->execute() && $stmt_update_notes->rowCount() > 0) {
                 $_SESSION['brand_admin_message'] = "<div class='brand-admin-message success'>Internal notes for Order #{$order_id} saved successfully.</div>";
-                header("Location: order_detail.php?order_id={$order_id}");
+                header("Location: order_detail.php?order_id=".htmlspecialchars($order_id)); // FIX: htmlspecialchars
                 exit;
             } else {
                 $message = "<div class='brand-admin-message error'>Failed to save internal notes. The order might not contain your brand's products or no changes were made.</div>";
             }
         } catch (PDOException $e) {
             error_log("Brand Admin Order Detail - Error saving internal notes for order ID {$order_id}: " . $e->getMessage());
-            $message = "<div class='brand-admin-message error'>Database error saving internal notes: " . $e->getMessage() . "</div>";
+            $message = "<div class='brand-admin-message error'>Database error saving internal notes.</div>"; // FIX: Removed raw error message
         }
     } else {
         $error_message_text = "<ul>";
-        foreach($errors as $err) { $error_message_text .= "<li>{$err}</li>"; }
+        foreach($errors as $err) { $error_message_text .= "<li>" . htmlspecialchars($err) . "</li>"; } // FIX: htmlspecialchars
         $error_message_text .= "</ul>";
         $message = "<div class='brand-admin-message error'>{$error_message_text}</div>";
     }
@@ -289,7 +294,7 @@ $csrf_token = $_SESSION['csrf_token'];
 
 ?>
 
-<h1 class="brand-admin-page-title"><?php echo $brand_admin_page_title; ?> for <?php echo htmlspecialchars($current_brand_name); ?></h1>
+<h1 class="brand-admin-page-title"><?php echo htmlspecialchars($brand_admin_page_title); ?> for <?php echo htmlspecialchars($current_brand_name); ?></h1>
 <p><a href="orders.php">&laquo; Back to Order List</a></p>
 
 <?php if ($message) echo $message; ?>
@@ -317,9 +322,7 @@ $csrf_token = $_SESSION['csrf_token'];
             <h2 style="margin-top:0;">Customer Details</h2>
             <?php if ($customer): ?>
                 <p><strong>Name:</strong> <?php echo htmlspecialchars(trim($customer['first_name'] . ' ' . $customer['last_name']) ?: 'N/A'); ?></p>
-                <p><strong>Username:</strong> <?php echo htmlspecialchars($customer['username']); ?></p>
-                <p><strong>Email:</strong> <a href="mailto:<?php echo htmlspecialchars($customer['email']); ?>"><?php echo htmlspecialchars($customer['email']); ?></a></p>
-                <p><strong>Phone:</strong> <?php echo htmlspecialchars($customer['phone_number'] ?? 'N/A'); ?></p>
+                <p><strong>Username:</strong> <?php echo htmlspecialchars($customer['username'] ?? 'N/A'); ?></p> <p><strong>Email:</strong> <a href="mailto:<?php echo htmlspecialchars($customer['email'] ?? ''); ?>"><?php echo htmlspecialchars($customer['email'] ?? ''); ?></a></p> <p><strong>Phone:</strong> <?php echo htmlspecialchars($customer['phone_number'] ?? 'N/A'); ?></p>
             <?php else: ?>
                 <p class="brand-admin-message warning">Customer details not found.</p>
             <?php endif; ?>
@@ -327,18 +330,13 @@ $csrf_token = $_SESSION['csrf_token'];
 
         <div class="shipping-details-section" style="flex: 1 1 350px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h2 style="margin-top:0;">Shipping Address</h2>
-            <p><strong>Recipient Name:</strong> <?php echo htmlspecialchars($order['shipping_name']); ?></p>
-            <p><strong>Phone:</strong> <?php echo htmlspecialchars($order['shipping_phone']); ?></p>
-            <p><?php echo htmlspecialchars($order['shipping_address_line1']); ?></p>
-            <?php if (!empty($order['shipping_address_line2'])): ?>
+            <p><strong>Recipient Name:</strong> <?php echo htmlspecialchars($order['shipping_name'] ?? 'N/A'); ?></p> <p><strong>Phone:</strong> <?php echo htmlspecialchars($order['shipping_phone'] ?? 'N/A'); ?></p> <p><?php echo htmlspecialchars($order['shipping_address_line1'] ?? 'N/A'); ?></p> <?php if (!empty($order['shipping_address_line2'])): ?>
                 <p><?php echo htmlspecialchars($order['shipping_address_line2']); ?></p>
             <?php endif; ?>
-            <p><?php echo htmlspecialchars($order['shipping_city']); ?>, <?php echo htmlspecialchars($order['shipping_governorate']); ?></p>
-            <?php if (!empty($order['shipping_postal_code'])): ?>
+            <p><?php echo htmlspecialchars($order['shipping_city'] ?? 'N/A'); ?>, <?php echo htmlspecialchars($order['shipping_governorate'] ?? 'N/A'); ?></p> <?php if (!empty($order['shipping_postal_code'])): ?>
                 <p>Postal Code: <?php echo htmlspecialchars($order['shipping_postal_code']); ?></p>
             <?php endif; ?>
-            <p><?php echo htmlspecialchars($order['shipping_country']); ?></p>
-        </div>
+            <p><?php echo htmlspecialchars($order['shipping_country'] ?? 'N/A'); ?></p> </div>
     </div>
 
     <div class="ordered-items-section" style="margin-top: 20px; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -363,7 +361,7 @@ $csrf_token = $_SESSION['csrf_token'];
                         <tr>
                             <td>
                                 <?php
-                                $item_image_url = $item['variant_image_url'] ?: $item['product_main_image'];
+                                $item_image_url = $item['variant_image_url'] ?: ($item['product_main_image'] ?? null); // FIX: Coalesce product_main_image
                                 $image_path = '';
                                 if (!empty($item_image_url)) {
                                     if (filter_var($item_image_url, FILTER_VALIDATE_URL)) {
@@ -376,35 +374,33 @@ $csrf_token = $_SESSION['csrf_token'];
                                 }
                                 $fallback_image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=Error');
                                 ?>
-                                <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($item['product_name']); ?>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
+                                <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($item['product_name'] ?? 'Product'); ?>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
                             </td>
                             <td>
-                                <a href="edit_product.php?product_id=<?php echo $item['product_id']; ?>" target="_blank">
-                                    <?php echo htmlspecialchars($item['product_name']); ?>
+                                <a href="edit_product.php?product_id=<?php echo htmlspecialchars($item['product_id']); ?>" target="_blank">
+                                    <?php echo htmlspecialchars($item['product_name'] ?? 'N/A'); ?>
                                 </a>
-                                <?php if ($item['variant_id']): ?>
-                                    <small style="display:block;">Variant ID: <?php echo $item['variant_id']; ?></small>
+                                <?php if (isset($item['variant_id']) && $item['variant_id']): // FIX: check isset ?>
+                                    <small style="display:block;">Variant ID: <?php echo htmlspecialchars($item['variant_id']); ?></small>
                                 <?php endif; ?>
                             </td>
                             <td><?php echo htmlspecialchars($item['variant_sku'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars($item['variant_attributes'] ?? 'N/A'); ?></td>
-                            <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$item['price_at_purchase'], 2)); ?></td>
-                            <td><?php echo htmlspecialchars($item['quantity']); ?></td>
-                            <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$item['subtotal_for_item'], 2)); ?></td>
+                            <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$item['price_at_purchase'], 2)); ?></td>
+                            <td><?php echo htmlspecialchars($item['quantity'] ?? 'N/A'); ?></td> <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$item['subtotal_for_item'], 2)); ?></td>
                             <td>
-                                <span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $item['item_status']))); ?>">
-                                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $item['item_status']))); ?>
+                                <span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $item['item_status'] ?? ''))); ?>">
+                                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $item['item_status'] ?? 'N/A'))); ?>
                                 </span>
                             </td>
                             <td class="actions">
-                                <form action="order_detail.php?order_id=<?php echo $order_id; ?>" method="POST" style="display:inline;">
-                                    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
-                                    <input type="hidden" name="order_item_id" value="<?php echo $item['order_item_id']; ?>">
+                                <form action="order_detail.php?order_id=<?php echo htmlspecialchars($order_id); ?>" method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf_token); ?>">
+                                    <input type="hidden" name="order_item_id" value="<?php echo htmlspecialchars($item['order_item_id']); ?>">
                                     <input type="hidden" name="update_item_status" value="1">
                                     <select name="item_status" onchange="this.form.submit()" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
                                         <?php foreach ($item_statuses_available as $status_val): ?>
-                                            <option value="<?php echo htmlspecialchars($status_val); ?>" <?php echo ($item['item_status'] == $status_val) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $status_val))); ?>
+                                            <option value="<?php echo htmlspecialchars($status_val); ?>" <?php echo ((string)$item['item_status'] === (string)$status_val) ? 'selected' : ''; ?>> <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $status_val))); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -426,8 +422,8 @@ $csrf_token = $_SESSION['csrf_token'];
             <p><strong>Customer Notes:</strong><br> <?php echo nl2br(htmlspecialchars($order['notes_to_seller'] ?? 'None')); ?></p>
             <hr>
             <p><strong>Internal Notes (Admin only):</strong></p>
-            <form action="order_detail.php?order_id=<?php echo $order_id; ?>" method="POST" class="brand-admin-form">
-                <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+            <form action="order_detail.php?order_id=<?php echo htmlspecialchars($order_id); ?>" method="POST" class="brand-admin-form">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf_token); ?>">
                 <input type="hidden" name="save_internal_notes" value="1">
                 <textarea name="internal_notes" rows="3" style="width:100%; margin-bottom:10px;" placeholder="Add internal notes..."><?php echo htmlspecialchars($order['internal_notes'] ?? ''); ?></textarea>
                 <button type="submit" class="btn-submit" style="font-size:0.9em;">Save Internal Notes</button>
@@ -435,16 +431,16 @@ $csrf_token = $_SESSION['csrf_token'];
         </div>
         <div class="order-totals" style="flex: 1 1 300px; text-align: right; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h3 style="margin-top:0; text-align:left;">Order Totals (Overall Order)</h3>
-            <p><strong>Subtotal:</strong> <?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$order['subtotal_amount'], 2)); ?></p>
-            <p><strong>Shipping:</strong> <?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$order['shipping_amount'], 2)); ?></p>
+            <p><strong>Subtotal:</strong> <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['subtotal_amount'], 2)); ?></p>
+            <p><strong>Shipping:</strong> <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['shipping_amount'], 2)); ?></p>
             <?php if ((float)$order['discount_amount'] > 0): ?>
-                <p><strong>Discount:</strong> -<?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$order['discount_amount'], 2)); ?></p>
+                <p><strong>Discount:</strong> -<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['discount_amount'], 2)); ?></p>
             <?php endif; ?>
             <?php if ((float)$order['tax_amount'] > 0): ?>
-                <p><strong>Tax:</strong> <?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$order['tax_amount'], 2)); ?></p>
+                <p><strong>Tax:</strong> <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['tax_amount'], 2)); ?></p>
             <?php endif; ?>
             <hr>
-            <p style="font-size: 1.2em; font-weight: bold;"><strong>Grand Total: <?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></strong></p>
+            <p style="font-size: 1.2em; font-weight: bold;"><strong>Grand Total: <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></strong></p>
             <small style="display:block; margin-top:5px;">(Reflects entire order, not just your items)</small>
         </div>
     </div>

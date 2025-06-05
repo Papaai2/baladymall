@@ -17,7 +17,7 @@ $db = getPDOConnection();
 
 // --- Filtering ---
 $filter_status = filter_input(INPUT_GET, 'filter_status', FILTER_UNSAFE_RAW);
-$search_order_id = filter_input(INPUT_GET, 'search_order_id', FILTER_VALIDATE_INT); // New: Search by Order ID
+$search_order_id = filter_input(INPUT_GET, 'search_order_id', FILTER_VALIDATE_INT);
 
 // --- Pagination ---
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -40,7 +40,7 @@ if (!empty($filter_status)) {
     $where_clauses[] = "o.order_status = :status";
     $params[':status'] = $filter_status;
 }
-if ($search_order_id) { // New: Add condition for Order ID search
+if ($search_order_id) {
     $where_clauses[] = "o.order_id = :order_id_search";
     $params[':order_id_search'] = $search_order_id;
 }
@@ -67,11 +67,11 @@ $total_pages = ceil($total_records / $records_per_page);
 
 // --- Fetch Orders for Current Page ---
 $orders = [];
-if ($total_records > 0 || empty($params)) {
+if ($total_records > 0 || (empty($params) && empty($where_clauses))) { // Attempt to fetch if records exist or no filters applied
     try {
         $stmt_orders = $db->prepare($sql_orders);
         foreach ($params as $key => $val) {
-            $stmt_orders->bindValue($key, $val);
+            $stmt_orders->bindValue($key, $val, is_int($val) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
         $stmt_orders->bindParam(':limit', $records_per_page, PDO::PARAM_INT);
         $stmt_orders->bindParam(':offset', $offset, PDO::PARAM_INT);
@@ -79,7 +79,7 @@ if ($total_records > 0 || empty($params)) {
         $orders = $stmt_orders->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         error_log("Admin Orders - Error fetching orders: " . $e->getMessage());
-        echo "<div class='admin-message error'>Error fetching orders. Details: " . $e->getMessage() . "</div>";
+        echo "<div class='admin-message error'>Error fetching orders.</div>"; // FIX: Removed raw error message
     }
 }
 
@@ -97,14 +97,13 @@ if (isset($_SESSION['admin_message'])) {
 }
 ?>
 
-<!-- Filter Form -->
 <div class="admin-filters">
     <form action="orders.php" method="GET">
         <label for="filter_status">Filter by Status:</label>
         <select name="filter_status" id="filter_status">
             <option value="">-- All Statuses --</option>
             <?php foreach ($order_statuses_available as $status_val): ?>
-                <option value="<?php echo htmlspecialchars($status_val); ?>" <?php echo ($filter_status == $status_val) ? 'selected' : ''; ?>>
+                <option value="<?php echo htmlspecialchars($status_val); ?>" <?php echo ((string)$filter_status === (string)$status_val) ? 'selected' : ''; ?>>
                     <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $status_val))); ?>
                 </option>
             <?php endforeach; ?>
@@ -136,18 +135,18 @@ if (isset($_SESSION['admin_message'])) {
                 <tr>
                     <td>#<?php echo htmlspecialchars($order['order_id']); ?></td>
                     <td>
-                        <?php echo htmlspecialchars(trim($order['customer_full_name']) ?: $order['customer_username']); ?>
-                        (ID: <?php echo htmlspecialchars($order['customer_user_id']); ?>)
+                        <?php echo htmlspecialchars(trim(($order['customer_full_name'] ?? '') ?: ($order['customer_username'] ?? 'N/A'))); ?>
+                        (ID: <?php echo htmlspecialchars($order['customer_user_id'] ?? 'N/A'); ?>)
                     </td>
                     <td><?php echo htmlspecialchars(date("M j, Y, g:i a", strtotime($order['order_date']))); ?></td>
-                    <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
+                    <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
                     <td>
                         <span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $order['order_status']))); ?>">
                             <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $order['order_status']))); ?>
                         </span>
                     </td>
                     <td class="actions">
-                        <a href="order_detail.php?order_id=<?php echo $order['order_id']; ?>" class="btn-view">View Details</a>
+                        <a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>" class="btn-view">View Details</a>
                         <?php // Add more actions like 'Update Status' if needed directly here or on detail page ?>
                     </td>
                 </tr>
@@ -155,33 +154,32 @@ if (isset($_SESSION['admin_message'])) {
         </tbody>
     </table>
 
-    <!-- Pagination Links -->
     <?php if ($total_pages > 1): ?>
         <div class="pagination" style="margin-top: 20px; text-align: center;">
             <?php
                 // Build query string for pagination, preserving filters
                 $pagination_query_params = [];
                 if (!empty($filter_status)) $pagination_query_params['filter_status'] = $filter_status;
-                if ($search_order_id) $pagination_query_params['search_order_id'] = $search_order_id; // New: Preserve search term
+                if ($search_order_id) $pagination_query_params['search_order_id'] = $search_order_id;
                 $pagination_query_string = http_build_query($pagination_query_params);
             ?>
             <?php if ($page > 1): ?>
-                <a href="?page=<?php echo $page - 1; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">&laquo; Previous</a>
+                <a href="?page=<?php echo htmlspecialchars($page - 1); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">&laquo; Previous</a>
             <?php endif; ?>
 
             <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                <a href="?page=<?php echo $i; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px; <?php if ($i == $page) echo 'background-color: #007bff; color: white;'; ?>">
-                    <?php echo $i; ?>
+                <a href="?page=<?php echo htmlspecialchars($i); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px; <?php if ($i == $page) echo 'background-color: #007bff; color: white;'; ?>">
+                    <?php echo htmlspecialchars($i); ?>
                 </a>
             <?php endfor; ?>
 
             <?php if ($page < $total_pages): ?>
-                <a href="?page=<?php echo $page + 1; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">Next &raquo;</a>
+                <a href="?page=<?php echo htmlspecialchars($page + 1); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">Next &raquo;</a>
             <?php endif; ?>
         </div>
     <?php endif; ?>
 
-<?php elseif (empty($params) && $total_records == 0): ?>
+<?php elseif ($total_records == 0 && empty($search_order_id) && empty($filter_status)): ?>
     <p class="admin-message info">No orders found yet.</p>
 <?php else: ?>
      <p class="admin-message info">No orders found matching your current filters.</p>

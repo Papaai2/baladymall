@@ -62,13 +62,13 @@ try {
 }
 
 // Initialize form variables with existing product data
-$product_name_form = $product['product_name'];
+$product_name_form = $product['product_name'] ?? ''; // FIX: Coalesce
 // brand_id_form is not needed as it's fixed to current_brand_id
 $category_ids_form = $current_category_ids;
-$product_description_form = $product['product_description'];
-$price_form = $product['price'];
-$compare_at_price_form = $product['compare_at_price'];
-$stock_quantity_form = $product['stock_quantity'];
+$product_description_form = $product['product_description'] ?? ''; // FIX: Coalesce
+$price_form = $product['price'] ?? ''; // FIX: Coalesce
+$compare_at_price_form = $product['compare_at_price'] ?? ''; // FIX: Coalesce
+$stock_quantity_form = $product['stock_quantity'] ?? '0'; // FIX: Coalesce, default to 0
 $is_active_form = $product['is_active'];
 $requires_variants_form = $product['requires_variants'];
 $current_main_image_url = $product['main_image_url'];
@@ -88,7 +88,7 @@ try {
 // --- Handle Form Submission for Update ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
     // Sanitize and validate inputs
-    $product_name_form = trim(filter_input(INPUT_POST, 'product_name', FILTER_UNSAFE_RAW));
+    $product_name_form = trim(substr(filter_input(INPUT_POST, 'product_name', FILTER_UNSAFE_RAW), 0, 255)); // FIX: Substr for maxlength
     $category_ids_form = isset($_POST['category_ids']) ? array_map('intval', $_POST['category_ids']) : [];
     $product_description_form = trim(filter_input(INPUT_POST, 'product_description', FILTER_UNSAFE_RAW));
 
@@ -105,6 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
 
     // Basic Validation
     if (empty($product_name_form)) $errors['product_name'] = "Product name is required.";
+    // FIX: Add maxlength validation for product_name
+    if (strlen($product_name_form) > 255) $errors['product_name'] = "Product name cannot exceed 255 characters.";
     if (empty($category_ids_form)) $errors['category_ids'] = "At least one category is required.";
 
     if ($price_form === null && !$requires_variants_form) {
@@ -117,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
     }
     if ($stock_quantity_form === false || $stock_quantity_form < 0) {
         $errors['stock_quantity'] = "Stock quantity must be a valid non-negative number.";
-        $stock_quantity_form = $product['stock_quantity']; // Revert to original on error for sticky
+        $stock_quantity_form = $product['stock_quantity'] ?? 0; // Revert to original or 0 on error for sticky
     }
 
     // --- Image Upload Handling (if new image provided) ---
@@ -150,7 +152,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
                     $main_image_url_db_path_update = 'products/' . $new_filename; // New image path for DB
                     if ($current_main_image_url && $current_main_image_url !== $main_image_url_db_path_update) {
                         // Only mark for deletion if the old URL was a relative path (meaning it was uploaded to our server)
-                        if (!filter_var($current_main_image_url, FILTER_VALIDATE_URL)) {
+                        // FIX: Added is_file() check for robustness
+                        if (!filter_var($current_main_image_url, FILTER_VALIDATE_URL) && strpos($current_main_image_url, '//') !== 0) {
                            $old_image_to_delete = PUBLIC_UPLOADS_PATH . $current_main_image_url;
                         }
                     }
@@ -240,8 +243,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
             $db->commit();
 
             // Delete old image file if replaced and it was a local upload
+            // FIX: Add file_exists and is_file checks for robustness
             if ($old_image_to_delete && file_exists($old_image_to_delete)) {
-                unlink($old_image_to_delete);
+                if (is_file($old_image_to_delete)) {
+                    unlink($old_image_to_delete);
+                } else {
+                    error_log("Brand Admin Edit Product - Old image marked for deletion was not a file: " . $old_image_to_delete);
+                }
             }
 
             $_SESSION['brand_admin_message'] = "<div class='brand-admin-message success'>Product '" . htmlspecialchars($product_name_form) . "' (ID: {$product_id}) updated successfully.</div>";
@@ -251,10 +259,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
         } catch (PDOException $e) {
             $db->rollBack();
             error_log("Brand Admin Edit Product - Error updating product for brand {$current_brand_id}: " . $e->getMessage());
-            if ($main_image_url_db_path_update !== $current_main_image_url && $main_image_url_db_path_update && file_exists(PUBLIC_UPLOADS_PATH . $main_image_url_db_path_update)) {
-                // If newly uploaded file exists and was supposed to replace an old one, delete it on DB failure
-                if (!filter_var($main_image_url_db_path_update, FILTER_VALIDATE_URL)) { // Only delete if it was a local file
-                    unlink(PUBLIC_UPLOADS_PATH . $main_image_url_db_path_update);
+            // If new image was uploaded but DB failed, delete the newly uploaded image
+            // FIX: Add file_exists and is_file checks for robustness
+            if ($main_image_url_db_path_update !== $current_main_image_url && $main_image_url_db_path_update) {
+                $new_uploaded_file_full_path = PUBLIC_UPLOADS_PATH . $main_image_url_db_path_update;
+                if (!filter_var($main_image_url_db_path_update, FILTER_VALIDATE_URL) && strpos($main_image_url_db_path_update, '//') !== 0 && file_exists($new_uploaded_file_full_path)) { // Only delete if it was a local file
+                    if (is_file($new_uploaded_file_full_path)) {
+                        unlink($new_uploaded_file_full_path);
+                    } else {
+                        error_log("Brand Admin Edit Product - Newly uploaded image was not a file during DB error cleanup: " . $new_uploaded_file_full_path);
+                    }
                 }
             }
             $errors['database'] = "An error occurred while updating the product. " . $e->getMessage();
@@ -265,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
     }
 }
 
-$brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name']);
+$brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name'] ?? 'Unnamed Product');
 
 ?>
 
@@ -273,22 +287,22 @@ $brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_
 <p><a href="products.php">&laquo; Back to Product List</a></p>
 
 <?php if ($message) echo $message; ?>
-<?php if (!empty($errors['database_fetch'])) echo "<div class='brand-admin-message error'>".$errors['database_fetch']."</div>"; ?>
+<?php if (!empty($errors['database_fetch'])) echo "<div class='brand-admin-message error'>".htmlspecialchars($errors['database_fetch'] ?? '')."</div>"; ?>
 
 
-<form action="edit_product.php?product_id=<?php echo $product_id; ?>" method="POST" class="brand-admin-form" enctype="multipart/form-data" style="max-width: 800px;">
+<form action="edit_product.php?product_id=<?php echo htmlspecialchars($product_id ?? ''); ?>" method="POST" class="brand-admin-form" enctype="multipart/form-data" style="max-width: 800px;">
     <fieldset>
         <legend>Basic Information</legend>
         <div class="form-group">
             <label for="product_name">Product Name <span style="color:red;">*</span></label>
-            <input type="text" id="product_name" name="product_name" value="<?php echo htmlspecialchars($product_name_form); ?>" required>
-            <?php if (isset($errors['product_name'])): ?><small style="color:red;"><?php echo $errors['product_name']; ?></small><?php endif; ?>
+            <input type="text" id="product_name" name="product_name" value="<?php echo htmlspecialchars($product_name_form ?? ''); ?>" required maxlength="255">
+            <?php if (isset($errors['product_name'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['product_name']); ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
             <label>Brand</label>
-            <input type="text" value="<?php echo htmlspecialchars($current_brand_name); ?>" disabled>
-            <small>This product is associated with your brand: <?php echo htmlspecialchars($current_brand_name); ?></small>
+            <input type="text" value="<?php echo htmlspecialchars($current_brand_name ?? ''); ?>" disabled>
+            <small>This product is associated with your brand: <?php echo htmlspecialchars($current_brand_name ?? ''); ?></small>
         </div>
 
         <div class="form-group">
@@ -297,21 +311,21 @@ $brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_
                 <?php if (!empty($categories)): ?>
                     <?php foreach ($categories as $category): ?>
                         <label style="display: block; margin-bottom: 5px;">
-                            <input type="checkbox" name="category_ids[]" value="<?php echo $category['category_id']; ?>"
+                            <input type="checkbox" name="category_ids[]" value="<?php echo htmlspecialchars($category['category_id'] ?? ''); ?>"
                                    <?php echo in_array($category['category_id'], $category_ids_form) ? 'checked' : ''; ?>>
-                            <?php echo htmlspecialchars($category['category_name']); ?>
+                            <?php echo htmlspecialchars($category['category_name'] ?? ''); ?>
                         </label>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <p>No categories found. Please contact Super Admin to add categories.</p>
                 <?php endif; ?>
             </div>
-            <?php if (isset($errors['category_ids'])): ?><small style="color:red;"><?php echo $errors['category_ids']; ?></small><?php endif; ?>
+            <?php if (isset($errors['category_ids'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['category_ids']); ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
             <label for="product_description">Product Description</label>
-            <textarea id="product_description" name="product_description" rows="6"><?php echo htmlspecialchars($product_description_form); ?></textarea>
+            <textarea id="product_description" name="product_description" rows="6"><?php echo htmlspecialchars($product_description_form ?? ''); ?></textarea>
         </div>
     </fieldset>
 
@@ -319,21 +333,21 @@ $brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_
         <legend>Pricing & Stock (for Simple Products)</legend>
         <small>If "Requires Variants" is checked, these might be overridden by variant-specific values.</small>
         <div class="form-group">
-            <label for="price">Price (<?php echo CURRENCY_SYMBOL; ?>) <span class="price-stock-label-note"><?php echo $requires_variants_form ? '(Optional if variants define price)' : '<span style="color:red;">*</span>'; ?></span></label>
-            <input type="number" id="price" name="price" value="<?php echo htmlspecialchars($price_form); ?>" step="0.01" min="0" placeholder="e.g., 199.99">
-            <?php if (isset($errors['price'])): ?><small style="color:red;"><?php echo $errors['price']; ?></small><?php endif; ?>
+            <label for="price">Price (<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? ''); ?>) <span class="price-stock-label-note"><?php echo $requires_variants_form ? '(Optional if variants define price)' : '<span style="color:red;">*</span>'; ?></span></label>
+            <input type="number" id="price" name="price" value="<?php echo htmlspecialchars($price_form ?? ''); ?>" step="0.01" min="0" placeholder="e.g., 199.99">
+            <?php if (isset($errors['price'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['price']); ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
-            <label for="compare_at_price">Compare at Price (<?php echo CURRENCY_SYMBOL; ?>)</label>
-            <input type="number" id="compare_at_price" name="compare_at_price" value="<?php echo htmlspecialchars($compare_at_price_form); ?>" step="0.01" min="0" placeholder="Optional 'was' price">
-            <?php if (isset($errors['compare_at_price'])): ?><small style="color:red;"><?php echo $errors['compare_at_price']; ?></small><?php endif; ?>
+            <label for="compare_at_price">Compare at Price (<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? ''); ?>)</label>
+            <input type="number" id="compare_at_price" name="compare_at_price" value="<?php echo htmlspecialchars($compare_at_price_form ?? ''); ?>" step="0.01" min="0" placeholder="Optional 'was' price">
+            <?php if (isset($errors['compare_at_price'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['compare_at_price']); ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
             <label for="stock_quantity">Stock Quantity <span class="price-stock-label-note"><?php echo $requires_variants_form ? '(Optional if variants define stock)' : ''; ?></span></label>
-            <input type="number" id="stock_quantity" name="stock_quantity" value="<?php echo htmlspecialchars($stock_quantity_form); ?>" step="1" min="0" placeholder="e.g., 50">
-            <?php if (isset($errors['stock_quantity'])): ?><small style="color:red;"><?php echo $errors['stock_quantity']; ?></small><?php endif; ?>
+            <input type="number" id="stock_quantity" name="stock_quantity" value="<?php echo htmlspecialchars($stock_quantity_form ?? ''); ?>" step="1" min="0" placeholder="e.g., 50">
+            <?php if (isset($errors['stock_quantity'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['stock_quantity']); ?></small><?php endif; ?>
         </div>
     </fieldset>
 
@@ -345,8 +359,8 @@ $brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_
             // Determine the correct image path for display
             $display_image_url = '';
             if (!empty($current_main_image_url)) {
-                if (filter_var($current_main_image_url, FILTER_VALIDATE_URL)) {
-                    // It's an absolute URL, use it directly
+                // Check if it's an absolute URL (starts with http:// or https:// or //)
+                if (filter_var($current_main_image_url, FILTER_VALIDATE_URL) || strpos($current_main_image_url, '//') === 0) {
                     $display_image_url = htmlspecialchars($current_main_image_url);
                 } else {
                     // It's a relative path, prepend PUBLIC_UPLOADS_URL_BASE
@@ -360,14 +374,14 @@ $brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_
             ?>
             <?php if ($display_image_url): ?>
                 <img src="<?php echo $display_image_url; ?>" alt="Current Main Image" style="max-width: 150px; max-height: 150px; display:block; margin-bottom:10px; border-radius: 4px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
-                <small>Current: <?php echo htmlspecialchars($current_main_image_url); ?></small>
+                <small>Current: <?php echo htmlspecialchars($current_main_image_url ?? ''); ?></small>
             <?php else: ?>
                 <p>No main image currently set.</p>
             <?php endif; ?>
             <label for="main_image_upload" style="margin-top:10px; display:block;">Upload New Main Image (Optional - Replaces current)</label>
             <input type="file" id="main_image_upload" name="main_image" accept="image/jpeg,image/png,image/gif,image/webp">
             <small>Recommended size: 800x800px. Max file size: <?php echo defined('MAX_IMAGE_SIZE') ? (MAX_IMAGE_SIZE/1024/1024) : '2'; ?>MB.</small>
-            <?php if (isset($errors['main_image'])): ?><small style="color:red;"><?php echo $errors['main_image']; ?></small><?php endif; ?>
+            <?php if (isset($errors['main_image'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['main_image']); ?></small><?php endif; ?>
         </div>
     </fieldset>
 
@@ -410,19 +424,31 @@ $brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_
 
 <script>
 function togglePriceStockRequired(requiresVariants) {
-    const priceLabelNotes = document.querySelectorAll('.price-stock-label-note');
-
-    priceLabelNotes.forEach(note => {
-        if (requiresVariants) {
-            note.innerHTML = '(Optional if variants define price/stock)';
-        } else {
-            note.innerHTML = '<span style="color:red;">*</span>';
-        }
-    });
-
+    const priceLabelNote = document.querySelector('label[for="price"] .price-stock-label-note');
+    const stockLabelNote = document.querySelector('label[for="stock_quantity"] .price-stock-label-note');
     const priceInput = document.getElementById('price');
-    if (priceInput) {
-        // priceInput.required = !requiresVariants;
+    // const stockInput = document.getElementById('stock_quantity'); // Not used in this snippet
+
+    if (priceLabelNote) {
+        if (requiresVariants) {
+            priceLabelNote.innerHTML = '(Optional if variants define price)';
+            // Set 'required' attribute dynamically for the input
+            if (priceInput) priceInput.required = false;
+        } else {
+            priceLabelNote.innerHTML = '<span style="color:red;">*</span>';
+            if (priceInput) priceInput.required = true;
+        }
+    }
+    // Also apply logic to stock_quantity if it has a specific note/required status toggle
+    if (stockLabelNote) {
+        if (requiresVariants) {
+            stockLabelNote.innerHTML = '(Optional if variants define stock)';
+        } else {
+            stockLabelNote.innerHTML = ''; // Stock is not * required for simple products in PHP (defaults to 0)
+            // If you want it required for simple products, change to:
+            // stockLabelNote.innerHTML = '<span style="color:red;">*</span>';
+            // if (stockInput) stockInput.required = true;
+        }
     }
 }
 

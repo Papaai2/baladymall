@@ -8,7 +8,7 @@ if (file_exists($main_config_path)) {
 } else {
     die("CRITICAL ADMIN EDIT BRAND ERROR: Main config.php not found.");
 }
-require_once 'auth_check.php';
+require_once 'auth_check.php'; // Ensures user is super_admin
 
 $admin_page_title = "Edit Brand";
 $message = '';
@@ -64,7 +64,7 @@ if (isset($_GET['brand_id']) && filter_var($_GET['brand_id'], FILTER_VALIDATE_IN
             header("Location: brands.php");
             exit;
         }
-        $admin_page_title = "Edit Brand: " . htmlspecialchars($brand_data['brand_name']);
+        $admin_page_title = "Edit Brand: " . htmlspecialchars($brand_data['brand_name'] ?? 'N/A'); // FIX: Coalesce for htmlspecialchars
     } catch (PDOException $e) {
         error_log("Admin Edit Brand - Error fetching brand: " . $e->getMessage());
         $message = "<div class='admin-message error'>Could not load brand data.</div>";
@@ -120,8 +120,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
                 if (move_uploaded_file($logo_file['tmp_name'], $destination)) {
                     $brand_logo_url_db_path_update = 'brands/' . $new_filename; // Relative path for DB
                     // If a new logo was successfully uploaded and there was an old one, mark old for deletion
+                    // FIX: Add check for local file path before marking for deletion
                     if ($current_brand_logo_url && $current_brand_logo_url !== $brand_logo_url_db_path_update) {
-                        $old_logo_file_to_delete = PUBLIC_UPLOADS_PATH . $current_brand_logo_url;
+                        if (strpos($current_brand_logo_url, 'http') === false && strpos($current_brand_logo_url, '//') !== 0) {
+                            $old_logo_file_to_delete = PUBLIC_UPLOADS_PATH . $current_brand_logo_url;
+                        }
                     }
                 } else {
                     $errors['brand_logo'] = "Failed to upload new brand logo. Check permissions or server error.";
@@ -136,15 +139,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
 
     // Basic Validation for other fields
     if (empty($new_brand_name)) $errors['brand_name'] = "Brand name is required.";
+    // MAX LENGTH validation for brand_name (e.g. 255 chars)
+    if (strlen($new_brand_name) > 255) $errors['brand_name'] = "Brand name cannot exceed 255 characters."; // Added
     if (!empty($new_brand_contact_email) && !filter_var($new_brand_contact_email, FILTER_VALIDATE_EMAIL)) {
         $errors['brand_contact_email'] = "Invalid contact email format.";
     }
+    // Check for a valid URL format but allow empty
     if (!empty($new_brand_website_url) && !filter_var($new_brand_website_url, FILTER_VALIDATE_URL)) {
         $errors['brand_website_url'] = "Invalid website URL format.";
+    } elseif (!empty($new_brand_website_url) && !preg_match('/^https?:\/\//i', $new_brand_website_url)) { // Ensure http/https
+         $errors['brand_website_url'] = "Website URL must start with http:// or https://."; // Added
     }
-    if ($new_commission_rate !== null && ($new_commission_rate < 0 || $new_commission_rate > 100)) {
+
+    if ($new_commission_rate === null) { // Filter_validate_float returns false on failure. If empty string was passed, it becomes null.
+        // It's allowed to be null, so no error here if null.
+    } elseif ($new_commission_rate < 0 || $new_commission_rate > 100) {
         $errors['commission_rate'] = "Commission rate must be between 0 and 100.";
     }
+
 
     if (empty($errors)) {
         try {
@@ -162,7 +174,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
             if (empty($errors)) {
                 $update_sql = "UPDATE brands SET
                                 brand_name = :brand_name,
-                                brand_logo_url = :brand_logo_url,    /* NEW: Include logo URL */
+                                brand_logo_url = :brand_logo_url,
                                 brand_description = :brand_description,
                                 brand_contact_email = :brand_contact_email,
                                 brand_contact_phone = :brand_contact_phone,
@@ -175,12 +187,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
 
                 $params_update = [
                     ':brand_name' => $new_brand_name,
-                    ':brand_logo_url' => $brand_logo_url_db_path_update, /* NEW: Set logo URL */
+                    ':brand_logo_url' => $brand_logo_url_db_path_update,
                     ':brand_description' => $new_brand_description ?: null,
                     ':brand_contact_email' => $new_brand_contact_email ?: null,
                     ':brand_contact_phone' => $new_brand_contact_phone ?: null,
                     ':brand_website_url' => $new_brand_website_url ?: null,
-                    ':commission_rate' => ($new_commission_rate === null || $new_commission_rate === '') ? null : $new_commission_rate,
+                    ':commission_rate' => $new_commission_rate, // Can be null if it was empty input
                     ':is_approved' => $new_is_approved,
                     ':brand_id' => $brand_id_to_edit
                 ];
@@ -189,7 +201,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
                     $db->commit();
                     // Delete old logo file if a new one was uploaded and DB update was successful
                     if ($old_logo_file_to_delete && file_exists($old_logo_file_to_delete)) {
-                        @unlink($old_logo_file_to_delete);
+                        // FIX: Use is_file()
+                        if (is_file($old_logo_file_to_delete)) {
+                            unlink($old_logo_file_to_delete);
+                        } else {
+                            error_log("Admin Edit Brand - Old logo marked for deletion was not a file: " . $old_logo_file_to_delete);
+                        }
                     }
 
                     $_SESSION['admin_message'] = "<div class='admin-message success'>Brand '" . htmlspecialchars($new_brand_name) . "' updated successfully.</div>";
@@ -202,8 +219,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
                 } else {
                     $db->rollBack();
                     // If DB update failed, delete newly uploaded logo to prevent orphaned files
-                    if ($brand_logo_url_db_path_update && $brand_logo_url_db_path_update !== $current_brand_logo_url && file_exists(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path_update)) {
-                         @unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path_update);
+                    // FIX: Add checks for local file path and is_file()
+                    if ($brand_logo_url_db_path_update && $brand_logo_url_db_path_update !== $current_brand_logo_url) {
+                        $uploaded_file_path = PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path_update;
+                        if (strpos($brand_logo_url_db_path_update, 'http') === false && strpos($brand_logo_url_db_path_update, '//') !== 0 && file_exists($uploaded_file_path)) {
+                            if (is_file($uploaded_file_path)) {
+                                unlink($uploaded_file_path);
+                            }
+                        }
                     }
                     $message = "<div class='admin-message error'>Failed to update brand.</div>";
                 }
@@ -212,8 +235,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
             $db->rollBack();
             error_log("Admin Edit Brand - Error updating brand: " . $e->getMessage());
             // If DB update failed due to exception, delete newly uploaded logo
-            if ($brand_logo_url_db_path_update && $brand_logo_url_db_path_update !== $current_brand_logo_url && file_exists(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path_update)) {
-                @unlink(PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path_update);
+            // FIX: Add checks for local file path and is_file()
+            if ($brand_logo_url_db_path_update && $brand_logo_url_db_path_update !== $current_brand_logo_url) {
+                $uploaded_file_path = PUBLIC_UPLOADS_PATH . $brand_logo_url_db_path_update;
+                if (strpos($brand_logo_url_db_path_update, 'http') === false && strpos($brand_logo_url_db_path_update, '//') !== 0 && file_exists($uploaded_file_path)) {
+                    if (is_file($uploaded_file_path)) {
+                        unlink($uploaded_file_path);
+                    }
+                }
             }
             if ($e->getCode() == '23000') { // Integrity constraint (e.g. unique brand_name if you have such constraint)
                  $message = "<div class='admin-message error'>Update failed. The brand name might already be in use.</div>";
@@ -231,7 +260,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_brand']) && $br
         $brand_data['brand_website_url'] = $new_brand_website_url;
         $brand_data['commission_rate'] = $new_commission_rate;
         $brand_data['is_approved'] = $new_is_approved;
-        $brand_data['brand_logo_url'] = $brand_logo_url_db_path_update; // Update for sticky form if upload worked
+        // Only update brand_logo_url for sticky form if upload succeeded or no new file was chosen.
+        // If an upload failed, we want to retain the old $current_brand_logo_url for display, not the failed attempt's path.
+        // $brand_data['brand_logo_url'] is implicitly $current_brand_logo_url (which is the initial value) unless new image was uploaded and succeeded.
+        // If upload succeeded, $brand_logo_url_db_path_update holds the new path. If it failed, it holds the old path.
+        // So, $brand_data['brand_logo_url'] = $brand_logo_url_db_path_update; is correct here.
+        $brand_data['brand_logo_url'] = $brand_logo_url_db_path_update;
     }
 }
 
@@ -264,12 +298,12 @@ if (!empty($errors)): ?>
 
 
 <?php if ($brand_data): ?>
-    <form action="brand_edit.php?brand_id=<?php echo $brand_id_to_edit; ?>" method="POST" class="admin-form" enctype="multipart/form-data" style="max-width: 700px;">
+    <form action="brand_edit.php?brand_id=<?php echo htmlspecialchars($brand_id_to_edit); ?>" method="POST" class="admin-form" enctype="multipart/form-data" style="max-width: 700px;">
         <fieldset>
             <legend>Brand Details</legend>
             <div class="form-group">
                 <label for="brand_name">Brand Name <span style="color:red;">*</span></label>
-                <input type="text" id="brand_name" name="brand_name" value="<?php echo htmlspecialchars($brand_data['brand_name']); ?>" required>
+                <input type="text" id="brand_name" name="brand_name" value="<?php echo htmlspecialchars($brand_data['brand_name'] ?? ''); ?>" required maxlength="255">
                 <?php if (isset($errors['brand_name'])): ?><small style="color:red;"><?php echo $errors['brand_name']; ?></small><?php endif; ?>
             </div>
 
@@ -280,9 +314,21 @@ if (!empty($errors)): ?>
 
             <div class="form-group">
                 <label for="brand_logo">Current Brand Logo</label>
-                <?php if (!empty($brand_data['brand_logo_url'])): ?>
-                    <img src="<?php echo htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $brand_data['brand_logo_url']); ?>?v=<?php echo time(); ?>" alt="<?php echo htmlspecialchars($brand_data['brand_name']); ?> Logo" style="max-width: 150px; max-height: 150px; display:block; margin-bottom:10px; border-radius: 4px; background: #f0f0f0; padding: 5px;">
-                    <small>Current: <?php echo htmlspecialchars($brand_data['brand_logo_url']); ?></small>
+                <?php
+                $logo_display_url = '';
+                // Check if it's a local upload path, otherwise assume it's external or placeholder
+                if (!empty($brand_data['brand_logo_url']) && strpos($brand_data['brand_logo_url'], 'http') === false && strpos($brand_data['brand_logo_url'], '//') !== 0) {
+                    $logo_display_url = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $brand_data['brand_logo_url']);
+                } elseif (!empty($brand_data['brand_logo_url'])) { // It's an external URL
+                     $logo_display_url = htmlspecialchars($brand_data['brand_logo_url']);
+                } else {
+                    $logo_display_url = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '150x150/eee/aaa?text=No+Logo');
+                }
+                $fallback_logo_url = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '150x150/eee/aaa?text=Error');
+                ?>
+                <?php if ($logo_display_url): ?>
+                    <img src="<?php echo $logo_display_url; ?>" alt="<?php echo htmlspecialchars($brand_data['brand_name'] ?? 'Brand'); ?> Logo" style="max-width: 150px; max-height: 150px; display:block; margin-bottom:10px; border-radius: 4px; background: #f0f0f0; padding: 5px;" onerror="this.onerror=null; this.src='<?php echo $fallback_logo_url; ?>';">
+                    <small>Current: <?php echo htmlspecialchars($brand_data['brand_logo_url'] ?? 'N/A'); ?></small>
                 <?php else: ?>
                     <p>No logo currently set.</p>
                 <?php endif; ?>
@@ -320,8 +366,7 @@ if (!empty($errors)): ?>
                     <?php if (isset($brand_data['admin_username']) && $brand_data['admin_username']): ?>
                         <strong>Username:</strong> <?php echo htmlspecialchars($brand_data['admin_username']); ?><br>
                         <strong>Email:</strong> <?php echo htmlspecialchars($brand_data['admin_email'] ?? 'N/A'); ?>
-                        (User ID: <?php echo htmlspecialchars($brand_data['user_id']); ?>)
-                        <?php // You might add a link here to edit this user in users.php ?>
+                        (User ID: <?php echo htmlspecialchars($brand_data['user_id'] ?? 'N/A'); ?>) <?php // You might add a link here to edit this user in users.php ?>
                         <br><small>To change the brand admin, edit the user in the User Management section and assign them to this brand, or update the user_id for this brand (requires careful handling).</small>
                     <?php else: ?>
                         <span style="color:red;">No admin user currently assigned to this brand.</span>

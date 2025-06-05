@@ -1,8 +1,8 @@
 <?php
 // admin/add_category.php - Super Admin: Add New Category
 
-$admin_base_url = '.'; 
-$main_config_path = dirname(__DIR__) . '/src/config/config.php'; 
+$admin_base_url = '.';
+$main_config_path = dirname(__DIR__) . '/src/config/config.php';
 if (file_exists($main_config_path)) {
     require_once $main_config_path;
 } else {
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
         // Check if category name already exists (optional, but good for usability)
         $stmt_check_name = $db->prepare("SELECT category_id FROM categories WHERE category_name = :name AND parent_category_id <=> :parent_id"); // <=> for NULL-safe comparison
         $stmt_check_name->bindParam(':name', $category_name_form);
-        $stmt_check_name->bindParam(':parent_id', $parent_category_id_form); // Check uniqueness within the same parent
+        $stmt_check_name->bindParam(':parent_id', $parent_category_id_form, PDO::PARAM_INT); // Bind as INT
         $stmt_check_name->execute();
         if ($stmt_check_name->fetch()) {
             $errors['category_name'] = "A category with this name already exists " . ($parent_category_id_form ? "under the selected parent." : "at the top level.");
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
         $image_file = $_FILES['category_image'];
         $upload_dir = PUBLIC_UPLOADS_PATH . 'categories/'; // Ensure this directory exists and is writable
         if (!is_dir($upload_dir)) {
-            if (!mkdir($upload_dir, 0775, true)) {
+            if (!mkdir($upload_dir, 0775, true)) { // Create directory if it doesn't exist
                  $errors['category_image'] = "Failed to create category image upload directory.";
             }
         }
@@ -117,30 +117,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
             $sql_insert_category = "INSERT INTO categories (category_name, category_description, parent_category_id, category_image_url, created_at, updated_at)
                                    VALUES (:category_name, :category_description, :parent_category_id, :category_image_url, NOW(), NOW())";
             $stmt_insert_category = $db->prepare($sql_insert_category);
-            
+
             $params_insert = [
                 ':category_name' => $category_name_form,
                 ':category_description' => $category_description_form ?: null,
                 ':parent_category_id' => $parent_category_id_form, // Will be NULL if not selected or invalid
                 ':category_image_url' => $category_image_url_db_path
             ];
-            
+
             if ($stmt_insert_category->execute($params_insert)) {
                 $new_category_id = $db->lastInsertId();
                 $_SESSION['admin_message'] = "<div class='admin-message success'>Category '" . htmlspecialchars($category_name_form) . "' added successfully (ID: {$new_category_id}).</div>";
                 header("Location: categories.php"); // Redirect to category list
                 exit;
             } else {
+                // If DB insert failed, delete uploaded image to prevent orphaned files
+                // FIX: Add check for file_exists and is_file()
                 if ($category_image_url_db_path && file_exists(PUBLIC_UPLOADS_PATH . $category_image_url_db_path)) {
-                    unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path); 
+                    if (is_file(PUBLIC_UPLOADS_PATH . $category_image_url_db_path)) {
+                        unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path);
+                    } else {
+                        error_log("Admin Add Category - Newly uploaded image was not a file during DB insert failure cleanup: " . PUBLIC_UPLOADS_PATH . $category_image_url_db_path);
+                    }
                 }
                 $message = "<div class='admin-message error'>Failed to add new category. Database error.</div>";
             }
 
         } catch (PDOException $e) {
             error_log("Admin Add Category - Error inserting category: " . $e->getMessage());
+            // If DB insert failed due to exception, delete uploaded image
+            // FIX: Add check for file_exists and is_file()
             if ($category_image_url_db_path && file_exists(PUBLIC_UPLOADS_PATH . $category_image_url_db_path)) {
-                unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path); 
+                if (is_file(PUBLIC_UPLOADS_PATH . $category_image_url_db_path)) {
+                    unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path);
+                } else {
+                    error_log("Admin Add Category - Newly uploaded image was not a file during DB exception cleanup: " . PUBLIC_UPLOADS_PATH . $category_image_url_db_path);
+                }
             }
             $errors['database'] = "An error occurred while adding the category. " . $e->getMessage();
             $message = "<div class='admin-message error'>An error occurred. Please check the details and try again.</div>";
@@ -164,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
         <legend>Category Details</legend>
         <div class="form-group">
             <label for="category_name">Category Name <span style="color:red;">*</span></label>
-            <input type="text" id="category_name" name="category_name" value="<?php echo htmlspecialchars($category_name_form); ?>" required>
+            <input type="text" id="category_name" name="category_name" value="<?php echo htmlspecialchars($category_name_form); ?>" required maxlength="255">
             <?php if (isset($errors['category_name'])): ?><small style="color:red;"><?php echo $errors['category_name']; ?></small><?php endif; ?>
         </div>
 
@@ -174,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_category'])) {
                 <option value="">-- None (Top Level Category) --</option>
                 <?php if (!empty($parent_categories_options)): ?>
                     <?php foreach ($parent_categories_options as $p_cat): ?>
-                        <option value="<?php echo $p_cat['category_id']; ?>" <?php echo ($parent_category_id_form == $p_cat['category_id']) ? 'selected' : ''; ?>>
+                        <option value="<?php echo htmlspecialchars($p_cat['category_id']); ?>" <?php echo ((string)$parent_category_id_form === (string)$p_cat['category_id']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($p_cat['category_name']); ?>
                         </option>
                     <?php endforeach; ?>

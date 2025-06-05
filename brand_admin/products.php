@@ -82,7 +82,7 @@ if ($total_records > 0 || empty($where_clauses)) { // Attempt to fetch if record
         $products = $stmt_products->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         error_log("Brand Admin Products - Error fetching products for brand {$current_brand_id}: " . $e->getMessage());
-        echo "<div class='brand-admin-message error'>Error fetching products. Details: " . $e->getMessage() . "</div>";
+        echo "<div class='brand-admin-message error'>Error fetching products.</div>"; // FIX: Removed raw error message
     }
 }
 
@@ -99,7 +99,7 @@ function deleteSingleProduct($db, $product_id_to_delete, $brand_id_owner) {
         return ['success' => false, 'message' => 'Product not found or does not belong to your brand.'];
     }
 
-    $product_image_path = $product_info['main_image_url'];
+    $product_main_image_url = $product_info['main_image_url']; // This is the relative path from DB
 
     // Check if product is part of any active/non-finalized orders
     // Deletion is now allowed if item_status is 'shipped_by_brand', 'delivered_to_customer', 'cancelled', or 'returned'.
@@ -125,7 +125,7 @@ function deleteSingleProduct($db, $product_id_to_delete, $brand_id_owner) {
         $stmt_imgs = $db->prepare("SELECT image_url FROM product_images WHERE product_id = :pid");
         $stmt_imgs->bindParam(':pid', $product_id_to_delete, PDO::PARAM_INT);
         $stmt_imgs->execute();
-        $image_files_to_delete = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
+        $image_files_to_delete_from_server = $stmt_imgs->fetchAll(PDO::FETCH_COLUMN);
 
         $stmt_del_imgs = $db->prepare("DELETE FROM product_images WHERE product_id = :pid");
         $stmt_del_imgs->bindParam(':pid', $product_id_to_delete, PDO::PARAM_INT);
@@ -161,13 +161,25 @@ function deleteSingleProduct($db, $product_id_to_delete, $brand_id_owner) {
 
         if ($stmt_delete_product->execute() && $stmt_delete_product->rowCount() > 0) {
             $db->commit();
-            // Delete the actual image files
-            if ($product_image_path && file_exists(PUBLIC_UPLOADS_PATH . $product_image_path)) {
-                @unlink(PUBLIC_UPLOADS_PATH . $product_image_path);
+            // Delete the actual image files from server
+            // Main image file
+            if ($product_main_image_url && !filter_var($product_main_image_url, FILTER_VALIDATE_URL) && strpos($product_main_image_url, '//') !== 0) {
+                $full_path_main_image = PUBLIC_UPLOADS_PATH . $product_main_image_url;
+                if (file_exists($full_path_main_image) && is_file($full_path_main_image)) {
+                    unlink($full_path_main_image);
+                } else {
+                    error_log("Brand Admin Products - Main image for deletion not found or not a file: " . $full_path_main_image);
+                }
             }
-            foreach ($image_files_to_delete as $img_file) {
-                if ($img_file && file_exists(PUBLIC_UPLOADS_PATH . $img_file)) {
-                    @unlink(PUBLIC_UPLOADS_PATH . $img_file);
+            // Additional gallery images
+            foreach ($image_files_to_delete_from_server as $img_file_url) {
+                if ($img_file_url && !filter_var($img_file_url, FILTER_VALIDATE_URL) && strpos($img_file_url, '//') !== 0) {
+                    $full_path_gallery_image = PUBLIC_UPLOADS_PATH . $img_file_url;
+                    if (file_exists($full_path_gallery_image) && is_file($full_path_gallery_image)) {
+                        unlink($full_path_gallery_image);
+                    } else {
+                        error_log("Brand Admin Products - Gallery image for deletion not found or not a file: " . $full_path_gallery_image);
+                    }
                 }
             }
             return ['success' => true, 'message' => 'Product and its associated data deleted successfully.'];
@@ -178,7 +190,7 @@ function deleteSingleProduct($db, $product_id_to_delete, $brand_id_owner) {
     } catch (PDOException $e) {
         $db->rollBack();
         error_log("Brand Admin Products - Error deleting product {$product_id_to_delete}: " . $e->getMessage());
-        return ['success' => false, 'message' => 'Database error during deletion: ' . $e->getMessage()];
+        return ['success' => false, 'message' => 'Database error during deletion.']; // FIX: Removed raw error message
     }
 }
 
@@ -225,9 +237,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_delete_products
         if ($deleted_count > 0 && empty($failed_deletions)) {
             $_SESSION['brand_admin_message'] = "<div class='brand-admin-message success'>Successfully deleted {$deleted_count} product(s).</div>";
         } elseif ($deleted_count > 0 && !empty($failed_deletions)) {
-            $_SESSION['brand_admin_message'] = "<div class='brand-admin-message warning'>Deleted {$deleted_count} product(s). However, some products could not be deleted:<br><ul><li>" . implode("</li><li>", $failed_deletions) . "</li></ul></div>";
+            $_SESSION['brand_admin_message'] = "<div class='brand-admin-message warning'>Deleted {$deleted_count} product(s). However, some products could not be deleted:<br><ul><li>" . htmlspecialchars(implode("</li><li>", $failed_deletions)) . "</li></ul></div>"; // FIX: htmlspecialchars
         } else {
-            $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>No products were deleted. Reasons:<br><ul><li>" . implode("</li><li>", $failed_deletions) . "</li></ul></div>";
+            $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>No products were deleted. Reasons:<br><ul><li>" . htmlspecialchars(implode("</li><li>", $failed_deletions)) . "</li></ul></div>"; // FIX: htmlspecialchars
         }
 
         header("Location: products.php?page={$page}" . ($filter_status ? "&filter_status={$filter_status}" : ""));
@@ -272,17 +284,15 @@ if (isset($_SESSION['brand_admin_message'])) {
         <label for="filter_status">Filter by Status:</label>
         <select name="filter_status" id="filter_status">
             <option value="">-- All Statuses --</option>
-            <option value="active" <?php echo ($filter_status === 'active') ? 'selected' : ''; ?>>Active</option>
-            <option value="inactive" <?php echo ($filter_status === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
-        </select>
+            <option value="active" <?php echo ((string)$filter_status === 'active') ? 'selected' : ''; ?>>Active</option> <option value="inactive" <?php echo ((string)$filter_status === 'inactive') ? 'selected' : ''; ?>>Inactive</option> </select>
 
         <button type="submit">Filter</button>
         <a href="products.php" style="margin-left: 10px;">Clear Filters</a>
     </form>
 </div>
 
-<form action="products.php?page=<?php echo $page; ?>&filter_status=<?php echo $filter_status; ?>" method="POST" id="batch-actions-form" class="brand-admin-form">
-    <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+<form action="products.php?page=<?php echo htmlspecialchars($page); ?>&filter_status=<?php echo htmlspecialchars($filter_status); ?>" method="POST" id="batch-actions-form" class="brand-admin-form">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf_token); ?>">
     <div style="margin-bottom: 15px;">
         <button type="submit" name="batch_delete_products" class="btn-submit" onclick="return confirm('Are you sure you want to delete all selected products and their related data? This action cannot be undone.');">Delete Selected Products</button>
     </div>
@@ -304,13 +314,13 @@ if (isset($_SESSION['brand_admin_message'])) {
             <tbody>
                 <?php foreach ($products as $product): ?>
                     <tr>
-                        <td><input type="checkbox" name="product_ids[]" value="<?php echo $product['product_id']; ?>" class="product-checkbox"></td>
+                        <td><input type="checkbox" name="product_ids[]" value="<?php echo htmlspecialchars($product['product_id']); ?>" class="product-checkbox"></td>
                         <td>
                             <?php
                             // Determine the correct image path
                             $image_path = '';
                             if (!empty($product['main_image_url'])) {
-                                if (filter_var($product['main_image_url'], FILTER_VALIDATE_URL)) {
+                                if (filter_var($product['main_image_url'], FILTER_VALIDATE_URL) || strpos($product['main_image_url'], '//') === 0) {
                                     // It's an absolute URL, use it directly
                                     $image_path = htmlspecialchars($product['main_image_url']);
                                 } else {
@@ -323,22 +333,22 @@ if (isset($_SESSION['brand_admin_message'])) {
                             }
                             $fallback_image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=Error');
                             ?>
-                            <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($product['product_name']); ?>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
+                            <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($product['product_name'] ?? ''); ?>" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
                         </td>
                         <td><?php echo htmlspecialchars($product['product_id']); ?></td>
-                        <td><?php echo htmlspecialchars($product['product_name']); ?></td>
-                        <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format((float)$product['price'], 2)); ?></td>
-                        <td><?php echo htmlspecialchars($product['stock_quantity']); ?></td>
+                        <td><?php echo htmlspecialchars($product['product_name'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$product['price'], 2)); ?></td>
+                        <td><?php echo htmlspecialchars($product['stock_quantity'] ?? '0'); ?></td>
                         <td>
                             <span class="status-<?php echo $product['is_active'] ? 'active' : 'inactive'; ?>">
                                 <?php echo $product['is_active'] ? 'Active' : 'Inactive'; ?>
                             </span>
                         </td>
                         <td class="actions">
-                            <a href="edit_product.php?product_id=<?php echo $product['product_id']; ?>" class="btn-edit">Edit</a>
-                            <form action="products.php?page=<?php echo $page; ?>&filter_status=<?php echo $filter_status; ?>" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this product and all its related data? This action cannot be undone.');">
-                                <input type="hidden" name="product_id" value="<?php echo $product['product_id']; ?>">
-                                <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+                            <a href="edit_product.php?product_id=<?php echo htmlspecialchars($product['product_id']); ?>" class="btn-edit">Edit</a>
+                            <form action="products.php?page=<?php echo htmlspecialchars($page); ?>&filter_status=<?php echo htmlspecialchars($filter_status); ?>" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this product and all its related data? This action cannot be undone.');">
+                                <input type="hidden" name="product_id" value="<?php echo htmlspecialchars($product['product_id']); ?>">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf_token); ?>">
                                 <button type="submit" name="delete_product" class="btn-suspend">Delete</button>
                             </form>
                         </td>
@@ -356,23 +366,25 @@ if (isset($_SESSION['brand_admin_message'])) {
                     $pagination_query_string = http_build_query($pagination_query_params);
                 ?>
                 <?php if ($page > 1): ?>
-                    <a href="?page=<?php echo $page - 1; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">&laquo; Previous</a>
+                    <a href="?page=<?php echo htmlspecialchars($page - 1); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">&laquo; Previous</a>
                 <?php endif; ?>
 
                 <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                    <a href="?page=<?php echo $i; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px; <?php if ($i == $page) echo 'background-color: #3f51b5; color: white;'; ?>">
-                        <?php echo $i; ?>
+                    <a href="?page=<?php echo htmlspecialchars($i); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px; <?php if ($i == $page) echo 'background-color: #3f51b5; color: white;'; ?>">
+                        <?php echo htmlspecialchars($i); ?>
                     </a>
                 <?php endfor; ?>
 
                 <?php if ($page < $total_pages): ?>
-                    <a href="?page=<?php echo $page + 1; ?>&<?php echo $pagination_query_string; ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">Next &raquo;</a>
+                    <a href="?page=<?php echo htmlspecialchars($page + 1); ?>&<?php echo htmlspecialchars($pagination_query_string); ?>" style="padding: 8px 12px; text-decoration: none; border: 1px solid #ddd; margin: 0 2px;">Next &raquo;</a>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
 
+    <?php elseif ($total_records == 0 && empty($filter_status)): ?>
+        <p class="brand-admin-message info">No products found for your brand yet. <a href="add_product.php">Add your first product!</a></p>
     <?php else: ?>
-        <p class="brand-admin-message info">No products found for your brand<?php echo !empty($filter_status) ? ' matching the current filter.' : '.'; ?> <a href="add_product.php">Add your first product!</a></p>
+        <p class="brand-admin-message info">No products found for your brand matching the current filter.</p>
     <?php endif; ?>
 </form> <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -392,6 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!checkbox.checked) {
                 selectAllCheckbox.checked = false;
             } else {
+                // Check if all are checked
                 let allChecked = true;
                 productCheckboxes.forEach(cb => {
                     if (!cb.checked) {

@@ -63,11 +63,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_products'])) {
         }
     }
 
+    $uploaded_file_path = $_FILES['product_csv']['tmp_name'] ?? null; // Ensure this is null if no file uploaded
+
     if (empty($errors)) {
-        $uploaded_file_path = $_FILES['product_csv']['tmp_name'];
         $file_extension = strtolower(pathinfo($_FILES['product_csv']['name'], PATHINFO_EXTENSION));
 
-        // --- CSV Parsing Logic (Placeholder) ---
+        // --- CSV Parsing Logic ---
         if ($file_extension === 'csv') {
             if (($handle = fopen($uploaded_file_path, "r")) !== FALSE) {
                 $row_number = 0;
@@ -101,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_products'])) {
                             ];
                             $missing_headers = array_diff($expected_headers, array_map('strtolower', $header));
                             if (!empty($missing_headers)) {
-                                $errors['csv_format'] = "Missing required CSV headers: " . implode(', ', $missing_headers) . ". Please use the template.";
+                                $errors['csv_format'] = "Missing required CSV headers: " . htmlspecialchars(implode(', ', $missing_headers)) . ". Please use the template."; // FIX: htmlspecialchars
                                 break; // Stop processing if headers are wrong
                             }
                             continue;
@@ -115,17 +116,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_products'])) {
 
                         // --- Product Data Extraction and Validation ---
                         $product_errors = [];
-                        $product_name = $row_data['product_name'];
+                        $product_name = trim($row_data['product_name']); // FIX: Trim here again for safety
                         $product_description = $row_data['product_description'] ?: null;
                         $price = filter_var($row_data['price'], FILTER_VALIDATE_FLOAT);
                         $compare_at_price = filter_var($row_data['compare_at_price'], FILTER_VALIDATE_FLOAT);
                         $stock_quantity = filter_var($row_data['stock_quantity'], FILTER_VALIDATE_INT);
-                        $main_image_url = $row_data['main_image_url'] ?: null; // This should be a full URL for external images, or a path to an existing uploaded image
+                        $main_image_url = $row_data['main_image_url'] ?: null;
                         $is_active = (strtolower($row_data['is_active']) === 'yes' || $row_data['is_active'] === '1') ? 1 : 0;
                         $requires_variants = (strtolower($row_data['requires_variants']) === 'yes' || $row_data['requires_variants'] === '1') ? 1 : 0;
                         $categories_raw = $row_data['categories'];
 
                         if (empty($product_name)) $product_errors[] = "Product Name is required.";
+                        // FIX: Add maxlength validation for product name
+                        if (strlen($product_name) > 255) $product_errors[] = "Product Name cannot exceed 255 characters.";
                         if ($price === false && !$requires_variants) $product_errors[] = "Price is required for simple products.";
                         if ($price !== false && $price < 0) $product_errors[] = "Price cannot be negative.";
                         if ($compare_at_price !== false && $compare_at_price < 0) $product_errors[] = "Compare at price cannot be negative.";
@@ -150,8 +153,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_products'])) {
 
                         // Handle main_image_url: For batch upload, this is usually an external URL or a path to a pre-uploaded image.
                         // We are NOT handling image uploads from CSV rows directly here.
-                        // If it's a URL, you might want to validate it or download it later.
                         // For now, we'll just store the provided URL/path.
+                        // Optional: If you want to validate the URL format
+                        if (!empty($main_image_url) && !filter_var($main_image_url, FILTER_VALIDATE_URL) && strpos($main_image_url, 'products/') !== 0) {
+                            // If it's not a valid URL and not a relative path starting with 'products/' (your expected upload subfolder)
+                            $product_errors[] = "Main image URL/path '{$main_image_url}' is invalid. Provide a full URL or a relative path from your uploads/products/ folder.";
+                        }
+
 
                         if (empty($product_errors)) {
                             // --- Database Insertion ---
@@ -199,21 +207,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_products'])) {
                                 }
 
                                 $db->commit();
-                                $upload_results[] = ['status' => 'success', 'message' => "Row {$row_number}: Product '{$product_name}' added successfully (ID: {$new_product_id})."];
+                                $upload_results[] = ['status' => 'success', 'message' => "Row {$row_number}: Product '" . htmlspecialchars($product_name) . "' added successfully (ID: {$new_product_id})."]; // FIX: htmlspecialchars
                                 $processed_count++;
 
                             } catch (PDOException $e) {
                                 $db->rollBack();
-                                $upload_results[] = ['status' => 'error', 'message' => "Row {$row_number}: Database error for '{$product_name}': " . $e->getMessage()];
+                                $upload_results[] = ['status' => 'error', 'message' => "Row {$row_number}: Database error for '" . htmlspecialchars($product_name) . "': " . htmlspecialchars($e->getMessage())]; // FIX: htmlspecialchars
                                 $failed_count++;
                             }
                         } else {
-                            $upload_results[] = ['status' => 'error', 'message' => "Row {$row_number}: Validation failed for '{$product_name}': " . implode(', ', $product_errors)];
+                            $upload_results[] = ['status' => 'error', 'message' => "Row {$row_number}: Validation failed for '" . htmlspecialchars($product_name) . "': " . htmlspecialchars(implode(', ', $product_errors))]; // FIX: htmlspecialchars
                             $failed_count++;
                         }
                     }
                 } // End if (empty($errors['db_categories']))
                 fclose($handle);
+
+                // FIX: Delete the uploaded CSV file
+                if ($uploaded_file_path && file_exists($uploaded_file_path) && is_file($uploaded_file_path)) {
+                    unlink($uploaded_file_path);
+                }
 
                 if (empty($errors)) {
                     $_SESSION['brand_admin_message'] = "<div class='brand-admin-message info'>Batch upload complete. Processed: {$processed_count}, Failed: {$failed_count}.</div>";
@@ -221,9 +234,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_products'])) {
 
             } else {
                 $errors['file_read'] = "Could not open the uploaded CSV file.";
+                // FIX: Delete the uploaded CSV file on failure to open
+                if ($uploaded_file_path && file_exists($uploaded_file_path) && is_file($uploaded_file_path)) {
+                    unlink($uploaded_file_path);
+                }
             }
         } elseif (in_array($file_extension, ['xlsx', 'xls'])) {
             $errors['excel_support'] = "Excel file parsing is not yet implemented. Please convert your file to CSV format.";
+            // FIX: Delete the uploaded Excel file
+            if ($uploaded_file_path && file_exists($uploaded_file_path) && is_file($uploaded_file_path)) {
+                unlink($uploaded_file_path);
+            }
             // For full Excel support, you would need a library like PhpSpreadsheet
             // require 'vendor/autoload.php'; // Assuming Composer for PhpSpreadsheet
             // use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -236,7 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_products'])) {
     if (!empty($errors)) {
         $message = "<div class='brand-admin-message error'>Please correct the following issues:<br><ul>";
         foreach ($errors as $error_msg) {
-            $message .= "<li>" . htmlspecialchars($error_msg) . "</li>";
+            $message .= "<li>" . htmlspecialchars($error_msg) . "</li>"; // FIX: htmlspecialchars
         }
         $message .= "</ul></div>";
     }
@@ -266,16 +287,16 @@ if ($message) echo $message;
     </p>
 
     <form action="batch_upload_products.php" method="POST" enctype="multipart/form-data" class="brand-admin-form">
-        <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
+        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf_token); ?>">
         <fieldset>
             <legend>Upload File</legend>
             <div class="form-group">
                 <label for="product_csv">Select CSV or Excel File:</label>
                 <input type="file" id="product_csv" name="product_csv" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" required>
                 <small>Max file size: 10MB. Supported formats: CSV, XLSX, XLS.</small>
-                <?php if (isset($errors['file_upload'])): ?><small style="color:red;"><?php echo $errors['file_upload']; ?></small><?php endif; ?>
-                <?php if (isset($errors['file_type'])): ?><small style="color:red;"><?php echo $errors['file_type']; ?></small><?php endif; ?>
-                <?php if (isset($errors['file_size'])): ?><small style="color:red;"><?php echo $errors['file_size']; ?></small><?php endif; ?>
+                <?php if (isset($errors['file_upload'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['file_upload']); ?></small><?php endif; ?>
+                <?php if (isset($errors['file_type'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['file_type']); ?></small><?php endif; ?>
+                <?php if (isset($errors['file_size'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['file_size']); ?></small><?php endif; ?>
             </div>
         </fieldset>
         <button type="submit" name="upload_products" class="btn-submit">Upload Products</button>

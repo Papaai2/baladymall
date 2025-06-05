@@ -27,6 +27,7 @@ $total_brand_products = 0;
 $average_brand_order_value = 0;
 $recent_brand_orders = [];
 $top_selling_products = [];
+$error_loading_dashboard = false; // Flag to control error message display
 
 try {
     // Total Sales and Orders for THIS brand (successful orders)
@@ -125,7 +126,10 @@ try {
 
 } catch (PDOException $e) {
     error_log("Brand Admin Dashboard - Error fetching data for brand ID {$current_brand_id}: " . $e->getMessage());
-    echo "<div class='brand-admin-message error'>Could not load all dashboard data for your brand. Please try again later. Error: " . $e->getMessage() . "</div>";
+    $error_loading_dashboard = true; // Set flag
+    // In production, would not expose $e->getMessage() to user
+    // echo "<div class='brand-admin-message error'>Could not load all dashboard data for your brand. Please try again later. Error: " . htmlspecialchars($e->getMessage()) . "</div>";
+    echo "<div class='brand-admin-message error'>Could not load all dashboard data for your brand. Please try again later.</div>";
 }
 
 ?>
@@ -138,7 +142,7 @@ try {
 <div class="stat-cards-container">
     <div class="stat-card total-sales">
         <h3>Total Brand Revenue</h3>
-        <p class="stat-value"><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($total_brand_sales, 2)); ?></p>
+        <p class="stat-value"><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format($total_brand_sales, 2)); ?></p>
         <p class="stat-description">From your brand's successful sales.</p>
     </div>
     <div class="stat-card total-orders">
@@ -148,7 +152,7 @@ try {
     </div>
     <div class="stat-card average-order">
         <h3>Avg. Order Value (Your Products)</h3>
-        <p class="stat-value"><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($average_brand_order_value, 2)); ?></p>
+        <p class="stat-value"><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format($average_brand_order_value, 2)); ?></p>
         <p class="stat-description">Per order with your products.</p>
     </div>
     <div class="stat-card total-products">
@@ -191,13 +195,13 @@ try {
                 <tbody>
                     <?php foreach ($recent_brand_orders as $order): ?>
                         <tr>
-                            <td><a href="order_detail.php?order_id=<?php echo $order['order_id']; ?>">#<?php echo htmlspecialchars($order['order_id']); ?></a></td>
+                            <td><a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>">#<?php echo htmlspecialchars($order['order_id']); ?></a></td>
                             <td><?php echo htmlspecialchars($order['customer_username'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars(date("M j, Y, g:i a", strtotime($order['order_date']))); ?></td>
-                            <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($order['total_amount'], 2)); ?></td>
+                            <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
                             <td><span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $order['order_status']))); ?>"><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $order['order_status']))); ?></span></td>
                             <td class="actions">
-                                <a href="order_detail.php?order_id=<?php echo $order['order_id']; ?>" class="btn-view">View</a>
+                                <a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>" class="btn-view">View</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -226,20 +230,23 @@ try {
                                 <?php
                                 $image_path = '';
                                 if (!empty($product['main_image_url'])) {
-                                    if (filter_var($product['main_image_url'], FILTER_VALIDATE_URL)) {
+                                    // Check if it's an absolute URL (starts with http:// or https:// or //)
+                                    if (filter_var($product['main_image_url'], FILTER_VALIDATE_URL) || strpos($product['main_image_url'], '//') === 0) {
                                         $image_path = htmlspecialchars($product['main_image_url']);
                                     } else {
+                                        // It's a relative path, prepend PUBLIC_UPLOADS_URL_BASE
                                         $image_path = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $product['main_image_url']);
                                     }
                                 } else {
+                                    // No image URL, use placeholder
                                     $image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '30x30/eee/aaa?text=Img');
                                 }
                                 $fallback_image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '30x30/eee/aaa?text=Error');
                                 ?>
-                                <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($product['product_name']); ?>" style="width: 30px; height: 30px; object-fit: cover; border-radius: 3px; vertical-align: middle; margin-right: 5px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
-                                <a href="edit_product.php?product_id=<?php echo $product['product_id']; ?>"><?php echo htmlspecialchars($product['product_name']); ?></a>
+                                <img src="<?php echo $image_path; ?>" alt="<?php echo htmlspecialchars($product['product_name'] ?? ''); ?>" style="width: 30px; height: 30px; object-fit: cover; border-radius: 3px; vertical-align: middle; margin-right: 5px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
+                                <a href="edit_product.php?product_id=<?php echo htmlspecialchars($product['product_id']); ?>"><?php echo htmlspecialchars($product['product_name'] ?? ''); ?></a>
                             </td>
-                            <td><?php echo htmlspecialchars($product['total_quantity_sold']); ?></td>
+                            <td><?php echo htmlspecialchars($product['total_quantity_sold'] ?? '0'); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -258,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const chartMonths = <?php echo json_encode($chart_months ?? []); ?>;
     const brandSalesData = <?php echo json_encode($brand_sales_data ?? []); ?>;
     const brandOrdersData = <?php echo json_encode($brand_orders_data ?? []); ?>;
-    const currencySymbol = '<?php echo CURRENCY_SYMBOL; ?>';
+    const currencySymbol = '<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? ''); ?>'; // FIX: htmlspecialchars on CURRENCY_SYMBOL in JS
 
     const defaultChartOptions = {
         responsive: true,
@@ -352,4 +359,3 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <?php
 include_once 'includes/footer.php';
-?>

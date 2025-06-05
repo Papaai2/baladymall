@@ -40,16 +40,16 @@ $contact_phone = defined('PUBLIC_CONTACT_PHONE') ? PUBLIC_CONTACT_PHONE : '+20 1
 <section class="info-page-section contact-page-section" style="padding: 30px 0;">
     <div class="container">
         <h1 class="section-title text-center mb-4" style="font-size: 2.5em; color: #343a40;"><?php echo esc_html($page_title); ?></h1>
-        
+
         <div class="page-content" style="background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
-            <div class="contact-layout" style="max-width: 600px; margin: 0 auto;"> 
-                
+            <div class="contact-layout" style="max-width: 600px; margin: 0 auto;">
+
                 <div class="contact-details">
                     <h2 style="font-size: 1.8em; color: #007bff; margin-bottom: 20px; text-align:center;">Get In Touch</h2>
                     <p style="margin-bottom: 20px; line-height: 1.7; text-align:center;">
                         We'd love to hear from you! Whether you have a question about our products, your order, or just want to say hello, feel free to reach out through any of the methods below.
                     </p>
-                    
+
                     <div class="contact-info-item" style="margin-bottom: 15px; text-align: center;">
                         <h4 style="font-size: 1.2em; color: #343a40; margin-bottom: 5px;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-envelope-fill" viewBox="0 0 16 16" style="vertical-align: middle; margin-right: 8px; color: #007bff;">

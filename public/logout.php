@@ -9,17 +9,17 @@ $config_path_from_public = __DIR__ . '/../src/config/config.php';
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
-    // Fallback or error if config is strictly needed for SITE_URL or SESSION_NAME
-    // For a simple logout, direct session handling might be enough if SITE_URL is hardcoded for redirect.
-    // However, using SITE_URL is better.
+    // Critical error if config is missing, as SITE_URL for redirect and SESSION_NAME are essential.
     die("Critical error: Main configuration file not found. Cannot process logout.");
 }
 
-// Start the session to access its variables and then destroy it.
-// Ensure session_name is set if it was used during session_start in header.php
+// Ensure the session is properly initialized with the correct name
+// config.php already handles session_start() if not active,
+// so typically, it would be active by the time this script runs.
 if (defined('SESSION_NAME')) {
     session_name(SESSION_NAME);
 }
+// The session should be started by config.php, but this check ensures it.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
@@ -44,7 +44,6 @@ session_destroy();
 
 // 4. Redirect to login page (or homepage) with a success message.
 // Ensure SITE_URL is defined (from config.php)
-$redirect_url = (defined('SITE_URL') ? rtrim(SITE_URL, '/') : '') . '/login.php?logged_out=success';
+$redirect_url = get_asset_url('login.php?logout=success');
 header("Location: " . $redirect_url);
 exit; // Important to prevent further script execution.
-?>

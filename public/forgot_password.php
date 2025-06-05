@@ -22,7 +22,7 @@ if (file_exists($header_path)) {
 
 // Redirect if user is already logged in
 if (isset($_SESSION['user_id'])) {
-    header("Location: " . rtrim(SITE_URL, '/') . "/my_account.php");
+    header("Location: " . get_asset_url("my_account.php")); // Use get_asset_url
     exit;
 }
 
@@ -66,7 +66,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['send_reset_link'])) {
                 $stmt_insert_token->execute();
 
                 // 4. Construct the reset link
-                $reset_link = rtrim(SITE_URL, '/') . "/reset_password.php?token=" . urlencode($token) . "&email=" . urlencode($user['email']);
+                $reset_link = get_asset_url("reset_password.php?token=" . urlencode($token) . "&email=" . urlencode($user['email'])); // Use get_asset_url
 
                 // 5. Send Email
                 $email_subject = SITE_NAME . " - Password Reset Request";
@@ -126,7 +126,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['send_reset_link'])) {
             <button type="submit" name="send_reset_link" class="btn btn-primary btn-block btn-lg">Send Reset Link</button>
         </div>
 
-        <p class="form-switch-link">Remember your password? <a href="<?php echo rtrim(SITE_URL, '/'); ?>/login.php">Login here</a>.</p>
+        <p class="form-switch-link">Remember your password? <a href="<?php echo get_asset_url('login.php'); ?>">Login here</a>.</p>
     </form>
 </section>
 

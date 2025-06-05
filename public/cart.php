@@ -6,7 +6,7 @@ ob_start();
 
 // --- CRITICAL FIX: Load config.php directly and unconditionally at the very beginning ---
 // This ensures all constants (like SESSION_NAME, SITE_URL, PROJECT_ROOT_PATH)
-// and functions (like getPDOConnection, send_email) are available immediately and correctly.
+// and functions (like getPDOConnection, send_email, get_asset_url) are available immediately and correctly.
 $config_path_from_public = __DIR__ . '/../src/config/config.php';
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
@@ -17,14 +17,15 @@ if (file_exists($config_path_from_public)) {
 
 // --- Debugging Log Points (Keep these for testing, remove in production) ---
 // These logs will now reflect the session status *after* config.php has run session_start()
-error_log("cart.php: Script start. Session status: " . session_status() . " (1=none, 2=active)");
-error_log("cart.php: User ID in session: " . ($_SESSION['user_id'] ?? 'NOT SET'));
-error_log("cart.php: User Role in session: " . ($_SESSION['role'] ?? 'NOT SET'));
+// error_log("cart.php: Script start. Session status: " . session_status() . " (1=none, 2=active)");
+// error_log("cart.php: User ID in session: " . ($_SESSION['user_id'] ?? 'NOT SET'));
+// error_log("cart.php: User Role in session: " . ($_SESSION['role'] ?? 'NOT SET'));
 // --- END Debugging Log Points ---
 
 
 // Define a flag to check if the request is AJAX
 $is_ajax_request = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+// An AJAX action is a POST request with an 'action' parameter, not intended for full page reload.
 $is_ajax_action = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && !isset($_POST['update_cart_all_btn']));
 
 
@@ -79,7 +80,7 @@ $cart_subtotal = 0;
 $cart_total_items = 0;
 $cart_action_message = $cart_action_message ?? '';
 
-// Initialize cart in session if it doesn't exist. This is now safe.
+// Initialize cart in session if it doesn't exist.
 if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
 }
@@ -101,7 +102,8 @@ if (isset($db) && $db instanceof PDO) {
     // This check will now reliably use the session data.
     if ($action === 'add' && !isset($_SESSION['user_id'])) {
         error_log("cart.php: Redirecting unauthenticated user for 'add' action.");
-        $redirect_url = rtrim(SITE_URL, '/') . "/login.php?auth=required&target=cart&message=login_to_add_to_cart";
+        // Use get_asset_url for consistency
+        $redirect_url = get_asset_url("login.php?auth=required&target=cart&message=login_to_add_to_cart");
 
         if ($is_ajax_request || $is_ajax_action) {
             ob_clean();
@@ -112,7 +114,7 @@ if (isset($db) && $db instanceof PDO) {
             echo json_encode($response);
             exit;
         } else {
-            $_SESSION['redirect_after_login'] = rtrim(SITE_URL, '/') . "/products.php"; // Redirect back to products page after login
+            $_SESSION['redirect_after_login'] = get_asset_url("products.php"); // Redirect back to products page after login
             $_SESSION['cart_message'] = "<div class='form-message info-message'>Please log in to add items to your cart.</div>";
             header("Location: " . $redirect_url);
             exit;
@@ -121,11 +123,12 @@ if (isset($db) && $db instanceof PDO) {
     // --- END REDIRECT LOGIC ---
 
 
-    // This block now only proceeds if an action is set, product ID is valid, AND user is logged in
+    // This block now only proceeds if an action is set, product ID is valid, AND user is logged in (unless it's 'update_all')
+    // The 'update_all' action is handled separately below as it's a POST-only, non-AJAX from main cart form.
     if ($action && $product_id_req !== null && $product_id_req > 0 && isset($_SESSION['user_id']) && $action !== 'update_all') {
-        error_log("cart.php: Processing action '{$action}' for logged-in user: " . $_SESSION['user_id']);
+        // error_log("cart.php: Processing action '{$action}' for logged-in user: " . $_SESSION['user_id']);
 
-        $stock_quantity_db = 9999;
+        $stock_quantity_db = 9999; // Default large number for variants or no stock tracking
         $is_simple_product_with_stock_db = false;
         $product_name_for_message_db = "Product (ID: {$product_id_req})";
         $product_is_active_db = false;
@@ -145,7 +148,7 @@ if (isset($db) && $db instanceof PDO) {
                     $is_simple_product_with_stock_db = true;
                 }
             } else {
-                 $msg_text = "Product (ID: {$product_id_req}) not found.";
+                 $msg_text = "Product (ID: {$product_id_req}) not found or inactive.";
                  if ($is_ajax_request || $is_ajax_action) {
                      ob_clean();
                      $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
@@ -153,7 +156,7 @@ if (isset($db) && $db instanceof PDO) {
                  } else {
                      $cart_action_message .= "<div class='form-message error-message'>{$msg_text}</div>";
                  }
-                 $action = null; // Prevent further processing
+                 $action = null; // Prevent further processing if product not found
             }
         } catch (PDOException $e) {
             error_log("Cart Action - Stock Check Error (Product ID: {$product_id_req}): " . $e->getMessage());
@@ -168,6 +171,7 @@ if (isset($db) && $db instanceof PDO) {
             $action = null; // Prevent further processing
         }
 
+        // Only proceed if product is found and active.
         if ($action && $product_is_active_db) {
             $current_quantity_for_action = is_numeric($quantity_request) ? (int)$quantity_request : 1;
 
@@ -176,40 +180,57 @@ if (isset($db) && $db instanceof PDO) {
                     if ($current_quantity_for_action <= 0) {
                         $msg_text = "Quantity must be at least 1.";
                         $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
-                    } elseif ($is_simple_product_with_stock_db && ($current_quantity_for_action > $stock_quantity_db && $stock_quantity_db > 0)) {
-                         $msg_text = "Cannot add {$current_quantity_for_action} of '{$product_name_for_message_db}'. Only {$stock_quantity_db} available. Max quantity added.";
-                         $current_quantity_for_action = $stock_quantity_db;
-                         $response['message'] = $msg_text; $response['success'] = true;
-                         $response['type'] = 'warning';
-                    } elseif ($is_simple_product_with_stock_db && $stock_quantity_db <= 0) {
-                        $msg_text = "Sorry, '{$product_name_for_message_db}' is out of stock.";
-                        $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
-                        break;
+                        // For non-AJAX, set message and don't continue to cart update for 0 or negative quantities.
+                        if (!($is_ajax_request || $is_ajax_action)) {
+                             $cart_action_message .= "<div class='form-message error-message'>{$msg_text}</div>";
+                        }
+                        break; // Exit switch
                     }
 
-                    if (!($is_simple_product_with_stock_db && $stock_quantity_db <= 0 && $current_quantity_for_action > 0) ) {
-                        if (isset($_SESSION['cart'][$product_id_req])) {
-                            $new_quantity_in_cart = $_SESSION['cart'][$product_id_req] + $current_quantity_for_action;
-                            if ($is_simple_product_with_stock_db && $new_quantity_in_cart > $stock_quantity_db && $stock_quantity_db > 0) {
-                                $_SESSION['cart'][$product_id_req] = $stock_quantity_db;
-                                $msg_text = "Total quantity for '{$product_name_for_message_db}' in cart exceeds stock. Adjusted to {$stock_quantity_db}.";
-                                $response['message'] = $msg_text; $response['success'] = true;
-                                $response['type'] = 'warning';
-                            } else {
-                                $_SESSION['cart'][$product_id_req] = $new_quantity_in_cart;
-                                $msg_text = "Added To Cart";
-                                $response['message'] = $msg_text;
-                                $response['success'] = true;
-                                if(!isset($response['type']) || $response['type'] === 'error') $response['type'] = 'success';
+                    if ($is_simple_product_with_stock_db) {
+                        if ($stock_quantity_db <= 0) {
+                            $msg_text = "Sorry, '{$product_name_for_message_db}' is out of stock.";
+                            $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
+                            if (!($is_ajax_request || $is_ajax_action)) {
+                                 $cart_action_message .= "<div class='form-message error-message'>{$msg_text}</div>";
                             }
-                        } else {
-                            $_SESSION['cart'][$product_id_req] = $current_quantity_for_action;
-                            $msg_text = "Added To Cart";
-                            $response['message'] = $msg_text;
-                            $response['success'] = true;
-                            if(!isset($response['type']) || $response['type'] === 'error') $response['type'] = 'success';
+                            break; // Exit switch if product is truly out of stock
+                        }
+                        // Adjust current quantity to add if it exceeds stock
+                        if ($current_quantity_for_action > $stock_quantity_db) {
+                             $msg_text = "Cannot add {$current_quantity_for_action} of '{$product_name_for_message_db}'. Only {$stock_quantity_db} available. Max quantity added.";
+                             $current_quantity_for_action = $stock_quantity_db; // Cap quantity to add at available stock
+                             $response['message'] = $msg_text; $response['success'] = true; // Still success but with warning
+                             $response['type'] = 'warning';
                         }
                     }
+
+                    // Proceed to add/update in session cart (after stock checks)
+                    if (isset($_SESSION['cart'][$product_id_req])) {
+                        $new_quantity_in_cart = $_SESSION['cart'][$product_id_req] + $current_quantity_for_action;
+                        if ($is_simple_product_with_stock_db && $new_quantity_in_cart > $stock_quantity_db) {
+                            $_SESSION['cart'][$product_id_req] = $stock_quantity_db; // Cap total in cart at available stock
+                            $msg_text = "Total quantity for '{$product_name_for_message_db}' in cart adjusted to max available: {$stock_quantity_db}.";
+                            $response['message'] = $msg_text; $response['success'] = true;
+                            $response['type'] = 'warning';
+                        } else {
+                            $_SESSION['cart'][$product_id_req] = $new_quantity_in_cart;
+                            // Only set success message if not already a warning from previous cap
+                            if(!isset($response['type']) || $response['type'] === 'error') {
+                                $msg_text = "Added to cart.";
+                                $response['message'] = $msg_text;
+                                $response['success'] = true;
+                                $response['type'] = 'success';
+                            }
+                        }
+                    } else {
+                        $_SESSION['cart'][$product_id_req] = $current_quantity_for_action;
+                        $msg_text = "Added to cart.";
+                        $response['message'] = $msg_text;
+                        $response['success'] = true;
+                        if(!isset($response['type']) || $response['type'] === 'error') $response['type'] = 'success';
+                    }
+
 
                     if ($is_ajax_request || $is_ajax_action) {
                         ob_clean();
@@ -219,7 +240,7 @@ if (isset($db) && $db instanceof PDO) {
                         exit;
                     }
                     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                        header("Location: " . rtrim(SITE_URL, '/') . "/cart.php?action_status=added&product_name=" . urlencode($product_name_for_message_db));
+                        header("Location: " . get_asset_url("cart.php?action_status=added&product_name=" . urlencode($product_name_for_message_db))); // Use get_asset_url
                         exit;
                     }
                     break;
@@ -237,7 +258,7 @@ if (isset($db) && $db instanceof PDO) {
                             $msg_text = "Cart updated for '{$product_name_for_message_db}'.";
                             $response['type'] = 'success'; $response['success'] = true;
                         }
-                    } else {
+                    } else { // Quantity is 0 or less, effectively remove
                         unset($_SESSION['cart'][$product_id_req]);
                         $msg_text = "'{$product_name_for_message_db}' removed from cart.";
                         $response['type'] = 'success'; $response['success'] = true;
@@ -250,7 +271,7 @@ if (isset($db) && $db instanceof PDO) {
                         echo json_encode($response);
                         exit;
                     }
-                    header("Location: " . rtrim(SITE_URL, '/') . "/cart.php?action_status=item_updated&product_name=" . urlencode($product_name_for_message_db));
+                    header("Location: " . get_asset_url("cart.php?action_status=item_updated&product_name=" . urlencode($product_name_for_message_db))); // Use get_asset_url
                     exit;
                     break;
 
@@ -271,15 +292,15 @@ if (isset($db) && $db instanceof PDO) {
                         echo json_encode($response);
                         exit;
                     }
-                    header("Location: " . rtrim(SITE_URL, '/') . "/cart.php?action_status=removed&product_name=" . urlencode($product_name_for_message_db));
+                    header("Location: " . get_asset_url("cart.php?action_status=removed&product_name=" . urlencode($product_name_for_message_db))); // Use get_asset_url
                     exit;
                     break;
             }
-        } elseif (!$product_is_active_db) {
-            $msg_text = "Sorry, '{$product_name_for_message_db}' is not currently active and cannot be added/updated in cart.";
+        } elseif (!$product_is_active_db && $product_id_req !== null) { // This condition handles product not found or inactive during initial stock check
+            $msg_text = "Sorry, '{$product_name_for_message_db}' is not currently active or available and cannot be added/updated in cart.";
             if ($is_ajax_request || $is_ajax_action) {
                 ob_clean();
-                $response['message'] = $msg['message']; $response['success'] = false; $response['type'] = 'error';
+                $response['message'] = $msg_text; $response['success'] = false; $response['type'] = 'error';
                 echo json_encode($response); exit;
             } else {
                 $cart_action_message .= "<div class='form-message error-message'>{$msg_text}</div>";
@@ -319,6 +340,7 @@ if (isset($db) && $db instanceof PDO) {
                             $current_product_is_simple_with_stock_ua = true;
                         }
                     } else {
+                        // Product not found, remove it from cart
                         unset($_SESSION['cart'][$pid]);
                         $update_messages[] = "Item '{$current_product_name_ua}' no longer available and removed.";
                         continue;
@@ -331,6 +353,7 @@ if (isset($db) && $db instanceof PDO) {
                 }
 
                 if (!$product_is_active_ua) {
+                    // Product is inactive, remove it from cart
                     unset($_SESSION['cart'][$pid]);
                     $update_messages[] = "Item '{$current_product_name_ua}' is no longer active and has been removed.";
                     continue;
@@ -343,7 +366,7 @@ if (isset($db) && $db instanceof PDO) {
                     } else {
                         $_SESSION['cart'][$pid] = $new_qty;
                     }
-                } else {
+                } else { // Quantity is 0 or less, effectively remove
                     unset($_SESSION['cart'][$pid]);
                     $update_messages[] = "'{$current_product_name_ua}' removed from cart.";
                 }
@@ -365,15 +388,24 @@ if (isset($db) && $db instanceof PDO) {
 
 
 // Display messages from GET parameters (after redirects from single item actions - these are for non-AJAX redirects)
-if(isset($_GET['action_status']) && (empty($cart_action_message) || strpos($cart_action_message, $_GET['action_status']) === false)){
+// This also processes messages set by other pages in session.
+if(isset($_GET['action_status']) || isset($_SESSION['cart_message'])){
     $status_product_name_get = isset($_GET['product_name']) ? esc_html(urldecode($_GET['product_name'])) : "Item";
-    switch($_GET['action_status']) {
+    switch($_GET['action_status'] ?? '') { // Use null coalescing for safety
         case 'added': $cart_action_message .= "<div class='form-message success-message'>'{$status_product_name_get}' added/updated in cart.</div>"; break;
         case 'item_updated': $cart_action_message .= "<div class='form-message success-message'>Cart updated for '{$status_product_name_get}'.</div>"; break;
         case 'removed': $cart_action_message .= "<div class='form-message success-message'>'{$status_product_name_get}' removed from cart.</div>"; break;
-        case 'checkout_validation_error': $cart_action_message .= $_SESSION['cart_message'] ?? "<div class='form-message error-message'>There was an issue with your cart items during checkout. Please review.</div>"; unset($_SESSION['cart_message']); break;
-        case 'stock_unavailable': $cart_action_message .= $_SESSION['cart_message'] ?? "<div class='form-message error-message'>Stock for some items changed. Please review your cart.</div>"; unset($_SESSION['cart_message']); break;
-        case 'stock_update_error': $cart_action_message .= $_SESSION['cart_message'] ?? "<div class='form-message error-message'>An error occurred updating stock. Please review your cart.</div>"; unset($_SESSION['cart_message']); break;
+        case 'checkout_validation_error':
+        case 'stock_unavailable':
+        case 'stock_update_error':
+            // These messages are expected to be set in $_SESSION['cart_message'] by checkout.php
+            if (isset($_SESSION['cart_message'])) {
+                $cart_action_message .= $_SESSION['cart_message'];
+                unset($_SESSION['cart_message']); // Clear it after display
+            } else {
+                $cart_action_message .= "<div class='form-message error-message'>There was an issue with your cart items during checkout. Please review.</div>";
+            }
+            break;
     }
 }
 
@@ -434,7 +466,7 @@ if (!empty($_SESSION['cart']) && isset($db) && $db instanceof PDO) {
                 } else {
                     // Product not found or inactive, remove from cart
                     unset($_SESSION['cart'][$pid_session]);
-                    $temp_cart_validation_messages[] = "An item (ID: {$pid_session_int}) in your cart is no longer available and has been removed.";
+                    $temp_cart_validation_messages[] = "An item (ID: {$pid_session_int}) in your cart is no longer available or active and has been removed.";
                 }
             }
             if (!empty($temp_cart_validation_messages)) {
@@ -446,7 +478,7 @@ if (!empty($_SESSION['cart']) && isset($db) && $db instanceof PDO) {
         } catch (PDOException $e) {
             error_log("Error fetching cart item details for display: " . $e->getMessage());
             $cart_action_message .= "<div class='form-message error-message'>Could not load cart details. Please try again.</div>";
-            $_SESSION['cart'] = [];
+            $_SESSION['cart'] = []; // Clear cart on critical DB error for display
             $cart_items_details = [];
             $cart_subtotal = 0;
             $cart_total_items = 0;
@@ -455,10 +487,9 @@ if (!empty($_SESSION['cart']) && isset($db) && $db instanceof PDO) {
 }
 
 $_SESSION['header_cart_item_count'] = array_sum($_SESSION['cart']); // Recalculate total items for header
-$grand_total = $cart_subtotal;
+$grand_total = $cart_subtotal; // For now, grand total is just subtotal
 
-// ONLY output HTML if it's NOT an AJAX request. This block now correctly uses $header_path and $footer_path
-// which are defined unconditionally at the top.
+// ONLY output HTML if it's NOT an AJAX request.
 if (!($is_ajax_request || $is_ajax_action)) {
 ?>
 
@@ -467,17 +498,17 @@ if (!($is_ajax_request || $is_ajax_action)) {
         <h2 class="section-title text-center mb-4">Your Shopping Cart</h2>
 
         <?php if (!empty($cart_action_message)): ?>
-            <?php echo $cart_action_message; ?>
+            <?php echo $cart_action_message; // Messages are already HTML escaped ?>
         <?php endif; ?>
 
         <?php if (empty($cart_items_details)): ?>
             <div class="cart-empty text-center" style="padding-top: 30px; padding-bottom: 30px;">
                 <h3>Your cart is currently empty.</h3>
                 <p style="margin-top:15px; margin-bottom:25px;">Looks like you haven't added any products yet. Start exploring!</p>
-                <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary btn-lg">Shop Products</a>
+                <a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-primary btn-lg">Shop Products</a>
             </div>
         <?php else: ?>
-            <form action="<?php echo rtrim(SITE_URL, '/'); ?>/cart.php" method="POST" class="cart-form">
+            <form action="<?php echo get_asset_url('cart.php'); ?>" method="POST" class="cart-form">
                 <input type="hidden" name="action" value="update_all">
                 <table class="cart-table">
                     <thead>
@@ -494,25 +525,38 @@ if (!($is_ajax_request || $is_ajax_action)) {
                             <tr>
                                 <td class="cart-item-image" data-label="Product Image">
                                     <?php
-                                        $item_image_url_display = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/F0F0F0/AAA?text=No+Image" : '#';
+                                        $item_image_url_display = '';
+
+                                        // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
+                                        $fallback_cart_item_image_esc = '';
+                                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                                            $fallback_cart_item_image_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/CCC/777?text=Error");
+                                        } else {
+                                            $fallback_cart_item_image_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
+                                        }
+
+                                        // Fix: Use get_asset_url for consistency in image paths, adjusting for 'products/filename.jpg'
                                         if (!empty($item['image_url'])) {
-                                            if (strpos($item['image_url'], 'http://') === 0 || strpos($item['image_url'], 'https://') === 0) {
+                                            if (filter_var($item['image_url'], FILTER_VALIDATE_URL)) {
                                                 $item_image_url_display = esc_html($item['image_url']);
-                                            } elseif (defined('PUBLIC_UPLOADS_URL_BASE')) {
-                                                $item_image_url_display = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim(esc_html($item['image_url']), '/');
-                                            } else { // Fallback if PUBLIC_UPLOADS_URL_BASE not defined
-                                                $item_image_url_display = rtrim(SITE_URL, '/') . '/' . ltrim(esc_html($item['image_url']), '/');
+                                            } else {
+                                                // Assuming $item['image_url'] starts with 'products/'. Prepends 'uploads/'
+                                                $item_image_url_display = get_asset_url('uploads/' . ltrim(esc_html($item['image_url']), '/'));
                                             }
                                         }
-                                        $fallback_cart_item_image = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/CCC/777?text=Error" : '#';
+
+                                        // If main $item_image_url_display is still empty, set it to the fallback
+                                        if (empty($item_image_url_display)) {
+                                            $item_image_url_display = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/80x80/F0F0F0/AAA?text=No+Image" : $fallback_cart_item_image_esc;
+                                        }
                                     ?>
-                                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/product_detail.php?id=<?php echo esc_html($item['id']); ?>">
+                                    <a href="<?php echo get_asset_url('product_detail.php?id=' . esc_html($item['id'])); ?>">
                                         <img src="<?php echo $item_image_url_display; ?>" alt="<?php echo esc_html($item['name']); ?>"
-                                             onerror="this.onerror=null;this.src='<?php echo $fallback_cart_item_image; ?>';">
+                                             onerror="this.onerror=null;this.src='<?php echo $fallback_cart_item_image_esc; ?>';">
                                     </a>
                                 </td>
                                 <td class="cart-item-name" data-label="Product">
-                                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/product_detail.php?id=<?php echo esc_html($item['id']); ?>">
+                                    <a href="<?php echo get_asset_url('product_detail.php?id=' . esc_html($item['id'])); ?>">
                                         <?php echo esc_html($item['name']); ?>
                                     </a>
                                      <?php if ($item['requires_variants'] == 1): ?>
@@ -530,7 +574,7 @@ if (!($is_ajax_request || $is_ajax_action)) {
                                 </td>
                                 <td class="cart-item-line-total text-right" data-label="Total"><?php echo CURRENCY_SYMBOL . esc_html(number_format($item['line_total'], 2)); ?></td>
                                 <td class="cart-item-remove text-center" data-label="Remove">
-                                    <a href="<?php echo rtrim(SITE_URL, '/'); ?>/cart.php?action=remove&product_id=<?php echo esc_html($item['id']); ?>"
+                                    <a href="<?php echo get_asset_url('cart.php?action=remove&product_id=' . esc_html($item['id'])); ?>"
                                        class="btn btn-sm btn-danger remove-item-btn"
                                        title="Remove <?php echo esc_html($item['name']); ?>"
                                        aria-label="Remove <?php echo esc_html($item['name']); ?>"
@@ -545,7 +589,7 @@ if (!($is_ajax_request || $is_ajax_action)) {
 
                 <div class="cart-summary">
                     <div class="cart-actions-bar">
-                         <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-outline-secondary">
+                         <a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-outline-secondary">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16" style="margin-right:5px; vertical-align: text-bottom;"><path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8"/></svg>
                             Continue Shopping
                         </a>
@@ -559,7 +603,7 @@ if (!($is_ajax_request || $is_ajax_action)) {
                         <p><strong>Items in Cart:</strong> <span><?php echo esc_html($cart_total_items); ?></span></p>
                         <hr>
                         <p class="grand-total"><strong>Total:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($grand_total, 2)); ?></span></p>
-                        <a href="<?php echo rtrim(SITE_URL, '/'); ?>/checkout.php" class="btn btn-primary btn-lg btn-block mt-3">
+                        <a href="<?php echo get_asset_url('checkout.php'); ?>" class="btn btn-primary btn-lg btn-block mt-3">
                             Proceed to Checkout
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-arrow-right-circle-fill" viewBox="0 0 16 16" style="margin-left:8px; vertical-align: text-bottom;">
                                 <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0M4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5z"/>

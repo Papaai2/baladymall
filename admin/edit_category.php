@@ -47,12 +47,12 @@ try {
 }
 
 // Initialize form variables with existing category data
-$category_name_form = $category['category_name'];
 // FIX: Coalesce null to empty string for htmlspecialchars safety
+$category_name_form = $category['category_name'] ?? '';
 $category_description_form = $category['category_description'] ?? '';
 $parent_category_id_form = $category['parent_category_id'];
 $current_category_image_url = $category['category_image_url'];
-$admin_page_title = "Edit Category: " . htmlspecialchars($category['category_name']);
+$admin_page_title = "Edit Category: " . htmlspecialchars($category['category_name'] ?? 'N/A'); // FIX: Handle null for display
 
 
 // --- Fetch existing categories for Parent Category dropdown (excluding the current category itself) ---
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
         $stmt_check_name = $db->prepare("SELECT category_id FROM categories WHERE category_name = :name AND category_id != :current_id AND parent_category_id <=> :parent_id");
         $stmt_check_name->bindParam(':name', $category_name_form);
         $stmt_check_name->bindParam(':current_id', $category_id, PDO::PARAM_INT);
-        $stmt_check_name->bindParam(':parent_id', $new_parent_category_id_form);
+        $stmt_check_name->bindParam(':parent_id', $new_parent_category_id_form, PDO::PARAM_INT); // FIX: Bind as INT for parent_category_id
         $stmt_check_name->execute();
         if ($stmt_check_name->fetch()) {
             $errors['category_name'] = "Another category with this name already exists " . ($new_parent_category_id_form ? "under the selected parent." : "at the top level.");
@@ -145,8 +145,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
 
                 if (move_uploaded_file($image_file['tmp_name'], $destination)) {
                     $category_image_url_db_path_update = 'categories/' . $new_filename; // New image path for DB
+                    // FIX: Check if old image was a local file to delete
                     if ($current_category_image_url && $current_category_image_url !== $category_image_url_db_path_update) {
-                        $old_image_to_delete_on_success = PUBLIC_UPLOADS_PATH . $current_category_image_url;
+                        if (strpos($current_category_image_url, 'http') === false && strpos($current_category_image_url, '//') !== 0) {
+                           $old_image_to_delete_on_success = PUBLIC_UPLOADS_PATH . $current_category_image_url;
+                        }
                     }
                 } else {
                     $errors['category_image'] = "Failed to upload new category image.";
@@ -180,14 +183,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
             if ($stmt_update_category->execute($params_update)) {
                 // Delete old image file if replaced and DB update was successful
                 if ($old_image_to_delete_on_success && file_exists($old_image_to_delete_on_success)) {
-                    @unlink($old_image_to_delete_on_success);
+                    // FIX: Use is_file() to prevent accidental directory deletion
+                    if (is_file($old_image_to_delete_on_success)) {
+                        unlink($old_image_to_delete_on_success);
+                    } else {
+                         error_log("Admin Edit Category - Old image marked for deletion was not a file: " . $old_image_to_delete_on_success);
+                    }
                 }
                 $_SESSION['admin_message'] = "<div class='admin-message success'>Category '" . htmlspecialchars($category_name_form) . "' (ID: {$category_id}) updated successfully.</div>";
                 header("Location: categories.php?highlight_category_id=" . $category_id);
                 exit;
             } else {
-                 if ($category_image_url_db_path_update !== $current_category_image_url && file_exists(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update)) {
-                    @unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update); // Delete newly uploaded if DB fails
+                // If new image was uploaded but DB failed, delete the newly uploaded image
+                if ($category_image_url_db_path_update !== $current_category_image_url &&
+                    $category_image_url_db_path_update &&
+                    // FIX: Ensure it's a local file before attempting to delete
+                    strpos($category_image_url_db_path_update, 'http') === false && strpos($category_image_url_db_path_update, '//') !== 0 &&
+                    file_exists(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update)) {
+                    // FIX: Use is_file()
+                    if (is_file(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update)) {
+                        unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update);
+                    }
                 }
                 $message = "<div class='admin-message error'>Failed to update category. Database error.</div>";
             }
@@ -195,8 +211,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
         } catch (PDOException $e) {
             error_log("Admin Edit Category - Error updating category: " . $e->getMessage());
             // If new image was uploaded but DB failed, delete the newly uploaded image
-            if ($category_image_url_db_path_update !== $current_category_image_url && $category_image_url_db_path_update && file_exists(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update)) {
-                @unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update);
+            if ($category_image_url_db_path_update !== $current_category_image_url &&
+                $category_image_url_db_path_update &&
+                // FIX: Ensure it's a local file before attempting to delete
+                strpos($category_image_url_db_path_update, 'http') === false && strpos($category_image_url_db_path_update, '//') !== 0 &&
+                file_exists(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update)) {
+                // FIX: Use is_file()
+                if (is_file(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update)) {
+                    unlink(PUBLIC_UPLOADS_PATH . $category_image_url_db_path_update);
+                }
             }
             $errors['database'] = "An error occurred while updating the category. " . $e->getMessage();
             $message = "<div class='admin-message error'>An error occurred. Please check details.</div>";
@@ -214,12 +237,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
 <?php if ($message) echo $message; ?>
 <?php if (!empty($errors['database_fetch'])) echo "<div class='admin-message error'>".$errors['database_fetch']."</div>"; ?>
 
-<form action="edit_category.php?category_id=<?php echo $category_id; ?>" method="POST" class="admin-form" enctype="multipart/form-data" style="max-width: 700px;">
+<form action="edit_category.php?category_id=<?php echo htmlspecialchars($category_id); ?>" method="POST" class="admin-form" enctype="multipart/form-data" style="max-width: 700px;">
     <fieldset>
         <legend>Category Details</legend>
         <div class="form-group">
             <label for="category_name">Category Name <span style="color:red;">*</span></label>
-            <input type="text" id="category_name" name="category_name" value="<?php echo htmlspecialchars($category_name_form); ?>" required>
+            <input type="text" id="category_name" name="category_name" value="<?php echo htmlspecialchars($category_name_form); ?>" required maxlength="255">
             <?php if (isset($errors['category_name'])): ?><small style="color:red;"><?php echo $errors['category_name']; ?></small><?php endif; ?>
         </div>
 
@@ -230,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
                 <?php if (!empty($parent_categories_options)): ?>
                     <?php foreach ($parent_categories_options as $p_cat): ?>
                         <?php // Do not allow selecting self as parent - already filtered in query ?>
-                        <option value="<?php echo $p_cat['category_id']; ?>" <?php echo ($parent_category_id_form == $p_cat['category_id']) ? 'selected' : ''; ?>>
+                        <option value="<?php echo htmlspecialchars($p_cat['category_id']); ?>" <?php echo ((string)$parent_category_id_form === (string)$p_cat['category_id']) ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($p_cat['category_name']); ?>
                         </option>
                     <?php endforeach; ?>
@@ -248,9 +271,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_category'])) {
 
         <div class="form-group">
             <label for="category_image_display">Current Category Image</label>
-            <?php if ($current_category_image_url): ?>
-                <img src="<?php echo htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $current_category_image_url); ?>" alt="Current Category Image" style="max-width: 150px; max-height: 150px; display:block; margin-bottom:10px; border-radius: 4px;">
-                <small>Current: <?php echo htmlspecialchars($current_category_image_url); ?></small>
+            <?php
+            $display_image_url = '';
+            if (!empty($current_category_image_url)) {
+                // Check if it's an absolute URL (starts with http:// or https:// or //)
+                if (filter_var($current_category_image_url, FILTER_VALIDATE_URL) || strpos($current_category_image_url, '//') === 0) {
+                    $display_image_url = htmlspecialchars($current_category_image_url);
+                } else {
+                    // It's a relative path, prepend PUBLIC_UPLOADS_URL_BASE
+                    $display_image_url = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $current_category_image_url);
+                }
+            } else {
+                // No image URL, use placeholder
+                $display_image_url = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '150x150/eee/aaa?text=No+Img');
+            }
+            $fallback_image_path = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '150x150/eee/aaa?text=Error');
+            ?>
+            <?php if ($display_image_url): ?>
+                <img src="<?php echo $display_image_url; ?>" alt="<?php echo htmlspecialchars($category_name_form); ?> Image" style="max-width: 150px; max-height: 150px; display:block; margin-bottom:10px; border-radius: 4px;" onerror="this.onerror=null; this.src='<?php echo $fallback_image_path; ?>';">
+                <small>Current: <?php echo htmlspecialchars($current_category_image_url ?? 'N/A'); ?></small>
             <?php else: ?>
                 <p>No image currently set for this category.</p>
             <?php endif; ?>

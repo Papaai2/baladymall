@@ -10,6 +10,7 @@ $config_path_from_public = __DIR__ . '/../src/config/config.php'; // Path to con
 if (file_exists($config_path_from_public)) {
     require_once $config_path_from_public;
 } else {
+    // Fallback if the above path fails (e.g. if script is moved or symlinked differently)
     $alt_config_path = dirname(__DIR__) . '/src/config/config.php';
     if (file_exists($alt_config_path)) {
         require_once $alt_config_path;
@@ -45,8 +46,9 @@ $checkout_message = ''; // For general messages
 
 // --- 1. Authentication Check ---
 if (!isset($_SESSION['user_id'])) {
-    $_SESSION['redirect_after_login'] = rtrim(SITE_URL, '/') . "/checkout.php";
-    header("Location: " . rtrim(SITE_URL, '/') . "/login.php?auth=required&checkout=true");
+    // Use get_asset_url for the redirect path
+    $_SESSION['redirect_after_login'] = get_asset_url("checkout.php");
+    header("Location: " . get_asset_url("login.php?auth=required&checkout=true"));
     exit;
 }
 $user_id = (int)$_SESSION['user_id'];
@@ -57,7 +59,7 @@ $user_first_name = $_SESSION['first_name'] ?? ''; // Get user first name for ema
 if (!isset($_SESSION['cart']) || empty($_SESSION['cart'])) {
     // Redirect to cart page with a message if trying to access checkout with an empty cart
     $_SESSION['cart_message'] = "<div class='form-message info-message'>Your cart is empty. Please add items before proceeding to checkout.</div>";
-    header("Location: " . rtrim(SITE_URL, '/') . "/cart.php?status=empty_checkout_attempt");
+    header("Location: " . get_asset_url("cart.php?status=empty_checkout_attempt"));
     exit;
 }
 
@@ -72,6 +74,7 @@ if (empty($errors) && isset($db) && $db instanceof PDO) { // Proceed only if no 
         $product_ids_in_cart_checkout = array_map('intval', $product_ids_in_cart_checkout);
         $placeholders_checkout = implode(',', array_fill(0, count($product_ids_in_cart_checkout), '?'));
 
+        // Ensure products are active
         $sql_fetch_cart_items_checkout = "
             SELECT product_id, product_name, price, main_image_url, stock_quantity, requires_variants, brand_id
             FROM products
@@ -88,6 +91,7 @@ if (empty($errors) && isset($db) && $db instanceof PDO) { // Proceed only if no 
                     $product_data_co = $fetched_products_data_checkout[$pid_co_int];
                     $product_name_co_display = esc_html($product_data_co['product_name']);
 
+                    // Validate stock for simple products
                     if ($product_data_co['requires_variants'] == 0 && isset($product_data_co['stock_quantity'])) {
                         $current_stock_co = (int)$product_data_co['stock_quantity'];
                         if ($current_stock_co < $qty_co) {
@@ -111,7 +115,8 @@ if (empty($errors) && isset($db) && $db instanceof PDO) { // Proceed only if no 
                     $cart_subtotal_checkout += $line_total_co;
                     $cart_total_items_checkout += $qty_co;
                 } else {
-                    $errors['cart_availability'][$pid_co_int] = "An item (ID: {$pid_co_int}) previously in your cart is no longer available. Please review your cart.";
+                    // Item in cart not found in DB or is inactive, should be removed
+                    $errors['cart_availability'][$pid_co_int] = "An item (ID: {$pid_co_int}) previously in your cart is no longer available or active. Please review your cart.";
                 }
             }
         } catch (PDOException $e) {
@@ -131,7 +136,7 @@ if (empty($errors) && isset($db) && $db instanceof PDO) { // Proceed only if no 
         }
         $error_message_for_cart .= "</ul>";
         $_SESSION['cart_message'] = "<div class='form-message error-message'>{$error_message_for_cart}</div>";
-        header("Location: " . rtrim(SITE_URL, '/') . "/cart.php?status=checkout_validation_error");
+        header("Location: " . get_asset_url("cart.php?status=checkout_validation_error")); // Use get_asset_url
         exit;
     }
 }
@@ -265,7 +270,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                         $db->rollBack();
                         $errors['final_stock_check'] = "Unfortunately, stock for '" . esc_html($item_co['name']) . "' changed before your order could be completed. Please review your cart.";
                         $_SESSION['cart_message'] = "<div class='form-message error-message'>" . $errors['final_stock_check'] . "</div>";
-                        header("Location: " . rtrim(SITE_URL, '/') . "/cart.php?status=stock_unavailable");
+                        header("Location: " . get_asset_url("cart.php?status=stock_unavailable")); // Use get_asset_url
                         exit;
                     }
 
@@ -290,7 +295,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                             $db->rollBack();
                             $errors['stock_update_failed'] = "Could not update stock for '" . esc_html($item_co['name']) . "'. Order cancelled. Please try again.";
                              $_SESSION['cart_message'] = "<div class='form-message error-message'>" . $errors['stock_update_failed'] . "</div>";
-                            header("Location: " . rtrim(SITE_URL, '/') . "/cart.php?status=stock_update_error");
+                            header("Location: " . get_asset_url("cart.php?status=stock_update_error"));
                             exit;
                         }
                     }
@@ -318,7 +323,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                 $customer_email_subject = SITE_NAME . " - Order Confirmation #" . $new_order_id;
                 $customer_email_body = "Hello " . htmlspecialchars($user_first_name) . ",\n\n";
                 $customer_email_body .= "Thank you for your order! Your order #" . $new_order_id . " has been placed successfully.\n\n";
-                $customer_email_body .= "You can view your order details here: " . rtrim(SITE_URL, '/') . "/order_detail.php?order_id=" . $new_order_id . "\n\n";
+                $customer_email_body .= "You can view your order details here: " . get_asset_url("order_detail.php?order_id=" . $new_order_id) . "\n\n"; // Use get_asset_url
                 $customer_email_body .= "Total Amount: " . CURRENCY_SYMBOL . number_format($grand_total_checkout, 2) . "\n\n";
                 $customer_email_body .= "We will notify you once your items are shipped.\n\n";
                 $customer_email_body .= "Regards,\n" . SITE_NAME . " Team";
@@ -341,13 +346,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                     $brand_admin_body = "Hello Brand Admin,\n\n";
                     $brand_admin_body .= "A new order (#{$new_order_id}) has been placed on " . SITE_NAME . " that includes products from your brand.\n\n";
                     $brand_admin_body .= "Please log in to your Brand Admin Panel to view the order details and update item statuses:\n";
-                    $brand_admin_body .= rtrim(SITE_URL, '/') . "/brand_admin/order_detail.php?order_id=" . $new_order_id . "\n\n";
+                    $brand_admin_body .= get_asset_url("brand_admin/order_detail.php?order_id=" . $new_order_id) . "\n\n"; // Use get_asset_url
                     $brand_admin_body .= "Regards,\n" . SITE_NAME . " Team";
 
                     send_email($admin_email_notif, $brand_admin_subject, $brand_admin_body);
                 }
 
-                header("Location: " . rtrim(SITE_URL, '/') . "/order_success.php");
+                header("Location: " . get_asset_url("order_success.php")); // Use get_asset_url
                 exit;
 
             } catch (PDOException $e) {
@@ -487,7 +492,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                     <?php endif; ?>
                 </div>
                 <?php if (!empty($cart_items_details_checkout) || empty($errors)): // Show return to cart link if cart had items or no major errors ?>
-                <p class="text-center mt-3"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/cart.php">&laquo; Return to Cart</a></p>
+                <p class="text-center mt-3"><a href="<?php echo get_asset_url('cart.php'); ?>">&laquo; Return to Cart</a></p>
                 <?php endif; ?>
             </div>
         </div>
@@ -502,4 +507,3 @@ if (file_exists($footer_path)) {
     die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path));
 }
 ?>
-

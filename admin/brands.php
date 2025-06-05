@@ -19,7 +19,8 @@ $message = $_SESSION['brand_management_message'] ?? ''; // Display message from 
 unset($_SESSION['brand_management_message']); // Clear message after displaying
 
 // Filters
-$filter_status = $_GET['status'] ?? 'all';
+// FIX: Use filter_input for user-supplied GET parameters
+$filter_status = filter_input(INPUT_GET, 'status', FILTER_UNSAFE_RAW) ?? 'all';
 
 try {
     // Select brand_logo_url as well
@@ -94,8 +95,13 @@ try {
                         <?php
                         $logo_display_url = '';
                         if (!empty($brand['brand_logo_url'])) {
-                            // Assuming PUBLIC_UPLOADS_URL_BASE is defined in config.php
-                            $logo_display_url = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $brand['brand_logo_url']);
+                            // Check if it's an absolute URL (starts with http:// or https:// or //)
+                            if (filter_var($brand['brand_logo_url'], FILTER_VALIDATE_URL) || strpos($brand['brand_logo_url'], '//') === 0) {
+                                $logo_display_url = htmlspecialchars($brand['brand_logo_url']);
+                            } else {
+                                // It's a relative path, prepend PUBLIC_UPLOADS_URL_BASE
+                                $logo_display_url = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . $brand['brand_logo_url']);
+                            }
                         } else {
                             // Placeholder if no logo is set
                             $logo_display_url = htmlspecialchars(PLACEHOLDER_IMAGE_URL_GENERATOR . '50x50/eee/aaa?text=Logo');
@@ -119,9 +125,9 @@ try {
                     </td>
                     <td><?php echo htmlspecialchars(date("M j, Y", strtotime($brand['created_at']))); ?></td>
                     <td class="actions">
-                        <a href="brand_edit.php?brand_id=<?php echo $brand['brand_id']; ?>" class="btn-edit">View/Edit</a>
+                        <a href="brand_edit.php?brand_id=<?php echo htmlspecialchars($brand['brand_id']); ?>" class="btn-edit">View/Edit</a>
                         <?php if ($brand['is_approved'] == 0): ?>
-                            <a href="brand_edit.php?brand_id=<?php echo $brand['brand_id']; ?>&action=approve" class="btn-approve" onclick="return confirm('Are you sure you want to approve this brand?');">Approve</a>
+                            <a href="brand_edit.php?brand_id=<?php echo htmlspecialchars($brand['brand_id']); ?>&action=approve" class="btn-approve" onclick="return confirm('Are you sure you want to approve this brand?');">Approve</a>
                         <?php endif; ?>
                         <?php // Add Suspend/Delete actions later ?>
                     </td>

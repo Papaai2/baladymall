@@ -24,6 +24,7 @@ $total_users = 0;
 $pending_brands_count = 0;
 $recent_orders = [];
 $sales_by_brand = []; // Top brands by sales
+$error_loading_dashboard = false; // Flag to control error message display
 
 try {
     // Total Sales and Orders (successful)
@@ -107,7 +108,8 @@ try {
 
 } catch (PDOException $e) {
     error_log("Admin Dashboard - Error fetching data: " . $e->getMessage());
-    echo "<div class='admin-message error'>Could not load all dashboard data. Please try again later. Error: " . $e->getMessage() . "</div>";
+    $error_loading_dashboard = true; // Set flag
+    echo "<div class='admin-message error'>Could not load all dashboard data. Please try again later.</div>"; // FIX: Removed raw error message
 }
 
 ?>
@@ -120,7 +122,7 @@ try {
 <div class="stat-cards-container">
     <div class="stat-card total-sales">
         <h3>Total Revenue</h3>
-        <p class="stat-value"><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($total_sales, 2)); ?></p>
+        <p class="stat-value"><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format($total_sales, 2)); ?></p>
         <p class="stat-description">From successful orders.</p>
     </div>
     <div class="stat-card total-orders">
@@ -130,7 +132,7 @@ try {
     </div>
     <div class="stat-card average-order">
         <h3>Average Order Value</h3>
-        <p class="stat-value"><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($average_order_value, 2)); ?></p>
+        <p class="stat-value"><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format($average_order_value, 2)); ?></p>
         <p class="stat-description">Per successful order.</p>
     </div>
      <div class="stat-card total-users">
@@ -182,13 +184,13 @@ try {
                 <tbody>
                     <?php foreach ($recent_orders as $order): ?>
                         <tr>
-                            <td><a href="order_detail.php?order_id=<?php echo $order['order_id']; ?>">#<?php echo htmlspecialchars($order['order_id']); ?></a></td>
+                            <td><a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>">#<?php echo htmlspecialchars($order['order_id']); ?></a></td>
                             <td><?php echo htmlspecialchars($order['customer_username'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars(date("M j, Y, g:i a", strtotime($order['order_date']))); ?></td>
-                            <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($order['total_amount'], 2)); ?></td>
+                            <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
                             <td><span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $order['order_status']))); ?>"><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $order['order_status']))); ?></span></td>
                             <td class="actions">
-                                <a href="order_detail.php?order_id=<?php echo $order['order_id']; ?>" class="btn-view">View</a>
+                                <a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>" class="btn-view">View</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -213,8 +215,7 @@ try {
                 <tbody>
                     <?php foreach ($sales_by_brand as $brand_sale): ?>
                         <tr>
-                            <td><a href="edit_brand.php?brand_id=<?php echo $brand_sale['brand_id']; ?>"><?php echo htmlspecialchars($brand_sale['brand_name']); ?></a></td>
-                            <td><?php echo CURRENCY_SYMBOL . htmlspecialchars(number_format($brand_sale['total_brand_sales'], 2)); ?></td>
+                            <td><a href="brand_edit.php?brand_id=<?php echo htmlspecialchars($brand_sale['brand_id']); ?>"><?php echo htmlspecialchars($brand_sale['brand_name']); ?></a></td> <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$brand_sale['total_brand_sales'], 2)); ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -234,7 +235,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const salesData = <?php echo json_encode($sales_data ?? []); ?>;
     const ordersData = <?php echo json_encode($orders_data ?? []); ?>;
     const usersDataChart = <?php echo json_encode($users_data_chart ?? []); ?>;
-    const currencySymbol = '<?php echo CURRENCY_SYMBOL; ?>';
+    const currencySymbol = '<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? ''); ?>'; // FIX: htmlspecialchars on CURRENCY_SYMBOL
 
     const defaultChartOptions = {
         responsive: true,

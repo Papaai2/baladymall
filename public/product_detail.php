@@ -101,7 +101,7 @@ if (file_exists($header_path)) {
         <?php if (!empty($page_error_message)): ?>
             <div class="form-message error-message text-center" style="padding: 20px; margin: 20px auto; max-width: 600px;">
                 <?php echo esc_html($page_error_message); ?>
-                <p class="mt-3"><a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php" class="btn btn-primary">Back to Products</a></p>
+                <p class="mt-3"><a href="<?php echo get_asset_url('products.php'); ?>" class="btn btn-primary">Back to Products</a></p>
             </div>
         <?php elseif ($product): ?>
             <div class="product-detail-layout">
@@ -117,33 +117,48 @@ if (file_exists($header_path)) {
                             }
 
                             $main_image_src = '';
+                            $fallback_image_src_esc = '';
+
+                            // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
+                            // Prefer a local 'no-image.png' as it's more reliable than external placeholders
+                            $fallback_image_src_esc = get_asset_url('images/no-image.png'); // Ensure this file exists in public/images/
+
+                            // If PLACEHOLDER_IMAGE_URL_GENERATOR is explicitly set and preferred as a fallback
+                            if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                                $fallback_image_src_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/600x600/E0E0E0/777?text=Error");
+                            }
+
+
+                            // Fix: If DB stores 'products/filename.jpg', ensure get_asset_url gets 'uploads/products/filename.jpg'
                             if (!empty($main_display_image_path)) {
-                                if (strpos($main_display_image_path, 'http://') === 0 || strpos($main_display_image_path, 'https://') === 0) {
+                                if (filter_var($main_display_image_path, FILTER_VALIDATE_URL)) {
                                     $main_image_src = esc_html($main_display_image_path);
-                                } elseif (defined('PUBLIC_UPLOADS_URL_BASE')) {
-                                    $main_image_src = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim(esc_html($main_display_image_path), '/');
-                                } else { // Fallback if PUBLIC_UPLOADS_URL_BASE not defined but path is relative
-                                    $main_image_src = rtrim(SITE_URL, '/') . '/' . ltrim(esc_html($main_display_image_path), '/');
+                                } else {
+                                    // Assuming $main_display_image_path starts with 'products/'. Prepends 'uploads/'
+                                    $main_image_src = get_asset_url('uploads/' . ltrim(esc_html($main_display_image_path), '/'));
                                 }
                             }
+
+                            // If main $main_image_src is still empty, set it to the fallback
                             if (empty($main_image_src)) {
-                                $main_image_src = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/600x600/F0F0F0/AAA?text=Product+Image" : '#';
+                                $main_image_src = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/600x600/F0F0F0/AAA?text=Product+Image" : $fallback_image_src_esc;
                             }
-                            $fallback_image_src = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/600x600/E0E0E0/777?text=Error" : '#';
                         ?>
                         <img src="<?php echo $main_image_src; ?>"
                              alt="<?php echo esc_html($product['product_name']); ?>"
                              id="mainProductImage"
-                             onerror="this.onerror=null;this.src='<?php echo $fallback_image_src; ?>';">
+                             onerror="this.onerror=null;this.src='<?php echo $fallback_image_src_esc; ?>';">
                     </div>
                     <?php
                         // Prepare all images for the thumbnail gallery, including the main one if set
                         $gallery_source_images = [];
                         if (!empty($product['main_image_url'])) {
+                            // Ensure the path is relative to 'uploads/products/'
                             $gallery_source_images[$product['main_image_url']] = ['image_url' => $product['main_image_url'], 'alt_text' => $product['product_name'] . ' - Main View'];
                         }
                         foreach ($additional_images as $img_item) {
                             if (!empty($img_item['image_url'])) { // Ensure URL is not empty
+                                // Ensure the path is relative to 'uploads/products/'
                                 $gallery_source_images[$img_item['image_url']] = $img_item; // Use URL as key to auto-deduplicate
                             }
                         }
@@ -155,23 +170,21 @@ if (file_exists($header_path)) {
                                     $thumb_path = !empty($image_data['image_url']) ? esc_html($image_data['image_url']) : '';
                                     $thumb_src = '';
                                     if (!empty($thumb_path)) {
-                                        if (strpos($thumb_path, 'http://') === 0 || strpos($thumb_path, 'https://') === 0) {
+                                        // Fix: Use get_asset_url for thumbnail sources, adjusting path from DB
+                                        if (filter_var($thumb_path, FILTER_VALIDATE_URL)) {
                                             $thumb_src = $thumb_path;
-                                        } elseif (defined('PUBLIC_UPLOADS_URL_BASE')) {
-                                            $thumb_src = rtrim(PUBLIC_UPLOADS_URL_BASE, '/') . '/' . ltrim($thumb_path, '/');
                                         } else {
-                                            $thumb_src = rtrim(SITE_URL, '/') . '/' . ltrim($thumb_path, '/');
+                                            $thumb_src = get_asset_url('uploads/products/' . ltrim($thumb_path, '/'));
                                         }
                                     } else {
                                         continue; // Skip if no valid image path for thumbnail
                                     }
-                                    $thumb_alt = !empty($image_data['alt_text']) ? esc_html($image_data['alt_text']) : esc_html($product['product_name']);
                                 ?>
                                 <img src="<?php echo $thumb_src; ?>"
-                                     alt="<?php echo $thumb_alt; ?>"
+                                     alt="<?php echo esc_html($image_data['alt_text']); ?>"
                                      class="thumbnail-image <?php echo ($thumb_src === $main_image_src) ? 'active' : ''; ?>"
                                      data-large-src="<?php echo $thumb_src; ?>"
-                                     onerror="this.onerror=null;this.src='<?php echo $fallback_image_src; ?>';">
+                                     onerror="this.onerror=null;this.src='<?php echo $fallback_image_src_esc; ?>';">
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
@@ -180,7 +193,7 @@ if (file_exists($header_path)) {
                 <div class="product-info animate-on-scroll" style="animation-delay: 0.2s;">
                     <h1 class="product-title"><?php echo esc_html($product['product_name']); ?></h1>
                     <p class="product-brand-info">
-                        By: <a href="<?php echo rtrim(SITE_URL, '/'); ?>/products.php?brand_id=<?php echo esc_html($product['brand_id']); ?>"><?php echo esc_html($product['brand_name']); ?></a>
+                        By: <a href="<?php echo get_asset_url('products.php?brand_id=' . esc_html($product['brand_id'])); ?>"><?php echo esc_html($product['brand_name']); ?></a>
                     </p>
 
                     <div class="price-section">
@@ -207,7 +220,7 @@ if (file_exists($header_path)) {
                         $is_in_stock = $product['requires_variants'] == 1 || ($product['requires_variants'] == 0 && $effective_stock > 0);
                         ?>
                         <?php if ($is_in_stock && $product['requires_variants'] == 0): ?>
-                            <form action="<?php echo rtrim(SITE_URL, '/'); ?>/cart.php" method="POST" class="add-to-cart-form ajax-add-to-cart-form">
+                            <form action="<?php echo get_asset_url('cart.php'); ?>" method="POST" class="add-to-cart-form ajax-add-to-cart-form">
                                 <input type="hidden" name="action" value="add">
                                 <input type="hidden" name="product_id" value="<?php echo esc_html($product['product_id']); ?>">
                                 <div class="quantity-selector form-group" style="max-width: 150px; margin-bottom:15px;">
