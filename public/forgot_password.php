@@ -113,14 +113,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['send_reset_link'])) {
     <?php if (!empty($message)) echo $message; ?>
 
     <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="POST" class="auth-form" novalidate>
-        <fieldset>
-            <legend>Email Address</legend>
+        
+            
             <div class="form-group">
                 <label for="email">Email Address <span class="required">*</span></label>
                 <input type="email" id="email" name="email" value="<?php echo esc_html($email_form); ?>" required aria-describedby="emailError">
                 <?php if (isset($errors['email'])): ?><span id="emailError" class="error-text"><?php echo esc_html($errors['email']); ?></span><?php endif; ?>
             </div>
-        </fieldset>
+        
 
         <div class="form-group">
             <button type="submit" name="send_reset_link" class="btn btn-primary btn-block btn-lg">Send Reset Link</button>

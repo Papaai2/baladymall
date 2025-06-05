@@ -190,7 +190,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
 
 <section class="auth-form-section">
     <h2>Create Account</h2>
-    <p>Join BaladyMall and start discovering amazing local products!</p>
+    <br><br>
 
     <?php if (!empty($errors['form'])): ?>
         <div class="form-message error-message">
@@ -199,8 +199,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
     <?php endif; ?>
 
     <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="POST" class="auth-form" novalidate>
-        <fieldset>
-            <legend>Account Details</legend>
+        
+            
             <div class="form-group">
                 <label for="username">Username <span class="required">*</span></label>
                 <input type="text" id="username" name="username" value="<?php echo esc_html($_POST['username'] ?? ''); ?>" required aria-describedby="usernameError">
@@ -230,10 +230,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
                 <input type="password" id="password_confirm" name="password_confirm" required aria-describedby="passwordConfirmError">
                 <?php if (isset($errors['password_confirm'])): ?><span id="passwordConfirmError" class="error-text"><?php echo esc_html($errors['password_confirm']); ?></span><?php endif; ?>
             </div>
-        </fieldset>
+        
 
-        <fieldset>
-            <legend>Shipping Address</legend>
+        
+            
              <div class="form-group">
                 <label for="first_name">First Name <span class="required">*</span></label>
                 <input type="text" id="first_name" name="first_name" value="<?php echo esc_html($_POST['first_name'] ?? ''); ?>" required aria-describedby="firstNameError">
@@ -267,7 +267,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
                 <label for="shipping_postal_code">Postal Code (Optional)</label>
                 <input type="text" id="shipping_postal_code" name="shipping_postal_code" value="<?php echo esc_html($_POST['shipping_postal_code'] ?? ''); ?>">
             </div>
-        </fieldset>
+        
 
         <div class="form-group">
             <button type="submit" name="register" class="btn btn-primary btn-block btn-lg">Create Account</button>

@@ -1,6 +1,8 @@
 <?php
 // public/checkout.php
 
+ob_start(); // Start output buffering at the very beginning
+
 $page_title = "Checkout - BaladyMall";
 
 // Configuration, Header, and Footer paths
@@ -18,6 +20,30 @@ if (file_exists($config_path_from_public)) {
         die("Critical error: Main configuration file not found. Please check paths.");
     }
 }
+
+// --- PLACEHOLDER send_email function ---
+// IMPORTANT: Replace this with your actual email sending logic.
+// This function should ideally be in config.php or an included helper/functions file.
+if (!function_exists('send_email')) {
+    function send_email($to, $subject, $body, $headers = []) {
+        // For development, you might log emails instead of sending them
+        $log_message = "---- EMAIL ----\n";
+        $log_message .= "To: " . $to . "\n";
+        $log_message .= "Subject: " . $subject . "\n";
+        $log_message .= "Body:\n" . $body . "\n";
+        if (!empty($headers)) {
+            $log_message .= "Headers: " . print_r($headers, true) . "\n";
+        }
+        $log_message .= "---------------\n";
+        error_log($log_message); // Logs to your PHP error log
+
+        // To actually send, you would use mail() or a library like PHPMailer
+        // return mail($to, $subject, $body, implode("\r\n", $headers));
+        return true; // Placeholder success
+    }
+}
+// --- END PLACEHOLDER send_email function ---
+
 
 // Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
 $header_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/header.php' : __DIR__ . '/../src/includes/header.php';
@@ -68,7 +94,7 @@ $cart_items_details_checkout = [];
 $cart_subtotal_checkout = 0;
 $cart_total_items_checkout = 0;
 
-if (empty($errors) && isset($db) && $db instanceof PDO) { // Proceed only if no critical DB error
+if (empty($errors['database']) && isset($db) && $db instanceof PDO) { // Proceed only if no critical DB error
     $product_ids_in_cart_checkout = array_keys($_SESSION['cart']);
     if (!empty($product_ids_in_cart_checkout)) {
         $product_ids_in_cart_checkout = array_map('intval', $product_ids_in_cart_checkout);
@@ -157,7 +183,7 @@ $user_shipping_info = [
     'notes_to_seller' => ''
 ];
 
-if (empty($errors) && isset($db) && $db instanceof PDO) { // Proceed only if no critical DB error
+if (empty($errors['database']) && isset($db) && $db instanceof PDO) { // Proceed only if no critical DB error
     try {
         $stmt_user_addr = $db->prepare("SELECT first_name, last_name, phone_number, shipping_address_line1, shipping_address_line2, shipping_city, shipping_governorate, shipping_postal_code, shipping_country FROM users WHERE user_id = :user_id");
         $stmt_user_addr->bindParam(':user_id', $user_id, PDO::PARAM_INT);
@@ -192,8 +218,9 @@ $grand_total_checkout = $cart_subtotal_checkout + $shipping_amount_checkout + $t
 
 // --- Handle Order Placement ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
-    if (!empty($errors)) { // If there were critical errors before form submission (e.g. DB down, cart validation)
-        // Do not proceed with order placement. Errors are already set.
+    if (!empty($errors['database']) || !empty($errors['cart_stock']) || !empty($errors['cart_availability']) || !empty($errors['address_fetch'])) {
+        // Do not proceed with order placement if there were critical errors before form submission.
+        // Errors are already set and will be displayed.
     } else {
         $shipping_name_post = trim(filter_input(INPUT_POST, 'shipping_name', FILTER_UNSAFE_RAW));
         $shipping_phone_post = trim(filter_input(INPUT_POST, 'shipping_phone', FILTER_UNSAFE_RAW));
@@ -204,7 +231,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
         $shipping_postal_code_post = trim(filter_input(INPUT_POST, 'shipping_postal_code', FILTER_UNSAFE_RAW));
         $shipping_country_post = trim(filter_input(INPUT_POST, 'shipping_country', FILTER_UNSAFE_RAW)) ?: 'Egypt';
         $payment_method_post = trim(filter_input(INPUT_POST, 'payment_method', FILTER_UNSAFE_RAW));
-        $notes_to_seller_post = trim(filter_input(INPUT_POST, 'notes_to_seller', FILTER_SANITIZE_SPECIAL_CHARS)); // Stricter sanitization for notes
+        $notes_to_seller_post = trim(filter_input(INPUT_POST, 'notes_to_seller', FILTER_SANITIZE_SPECIAL_CHARS));
 
         // Validation for POSTed data
         if (empty($shipping_name_post)) $errors['shipping_name'] = "Full name for shipping is required.";
@@ -214,7 +241,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
         if (empty($shipping_city_post)) $errors['shipping_city'] = "Shipping city is required.";
         if (empty($shipping_governorate_post)) $errors['shipping_governorate'] = "Shipping governorate is required.";
         if (empty($payment_method_post)) $errors['payment_method'] = "Please select a payment method.";
-        elseif (!in_array($payment_method_post, ['cod'])) $errors['payment_method'] = "Invalid payment method selected."; // Allow only 'cod' for now
+        elseif (!in_array($payment_method_post, ['cod'])) $errors['payment_method'] = "Invalid payment method selected.";
 
         if (empty($errors) && isset($db) && $db instanceof PDO) {
             $db->beginTransaction();
@@ -257,11 +284,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                 $sql_update_stock = "UPDATE products SET stock_quantity = stock_quantity - :quantity WHERE product_id = :product_id AND requires_variants = 0 AND stock_quantity IS NOT NULL AND stock_quantity >= :quantity_to_subtract";
                 $stmt_update_stock = $db->prepare($sql_update_stock);
 
-                // Collect brand admin emails for notification
                 $brand_admin_emails_for_notification = [];
 
                 foreach ($cart_items_details_checkout as $item_co) {
-                    // Re-check stock before committing this item to order_items and updating stock
                     $stmt_check_final_stock = $db->prepare("SELECT stock_quantity, requires_variants FROM products WHERE product_id = :pid AND is_active = 1");
                     $stmt_check_final_stock->execute([':pid' => $item_co['id']]);
                     $final_stock_info = $stmt_check_final_stock->fetch(PDO::FETCH_ASSOC);
@@ -270,7 +295,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                         $db->rollBack();
                         $errors['final_stock_check'] = "Unfortunately, stock for '" . esc_html($item_co['name']) . "' changed before your order could be completed. Please review your cart.";
                         $_SESSION['cart_message'] = "<div class='form-message error-message'>" . $errors['final_stock_check'] . "</div>";
-                        header("Location: " . get_asset_url("cart.php?status=stock_unavailable")); // Use get_asset_url
+                        header("Location: " . get_asset_url("cart.php?status=stock_unavailable"));
                         exit;
                     }
 
@@ -285,13 +310,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
 
                     if ($final_stock_info['requires_variants'] == 0 && isset($final_stock_info['stock_quantity'])) {
                         $stmt_update_stock->execute([
-                            ':quantity' => $item_co['quantity'], // This is the quantity being subtracted
+                            ':quantity' => $item_co['quantity'],
                             ':product_id' => $item_co['id'],
-                            ':quantity_to_subtract' => $item_co['quantity'] // Ensure stock is sufficient before subtracting
+                            ':quantity_to_subtract' => $item_co['quantity']
                         ]);
                          if ($stmt_update_stock->rowCount() == 0) {
-                            // This means stock was not updated, possibly due to race condition or stock_quantity < quantity
-                            // This case should ideally be caught by the re-check above, but as a safeguard:
                             $db->rollBack();
                             $errors['stock_update_failed'] = "Could not update stock for '" . esc_html($item_co['name']) . "'. Order cancelled. Please try again.";
                              $_SESSION['cart_message'] = "<div class='form-message error-message'>" . $errors['stock_update_failed'] . "</div>";
@@ -300,7 +323,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                         }
                     }
 
-                    // Fetch brand admin email for this product's brand
                     $stmt_brand_admin_email = $db->prepare("
                         SELECT u.email FROM users u
                         JOIN brands b ON u.user_id = b.user_id
@@ -310,7 +332,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                     $stmt_brand_admin_email->execute();
                     $brand_admin_email_result = $stmt_brand_admin_email->fetch(PDO::FETCH_ASSOC);
                     if ($brand_admin_email_result && !empty($brand_admin_email_result['email'])) {
-                        $brand_admin_emails_for_notification[$item_co['brand_id']] = $brand_admin_email_result['email']; // Store unique emails by brand_id
+                        $brand_admin_emails_for_notification[$item_co['brand_id']] = $brand_admin_email_result['email'];
                     }
                 }
 
@@ -319,19 +341,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                 unset($_SESSION['header_cart_item_count']);
                 $_SESSION['last_order_id'] = $new_order_id;
 
-                // --- Send Order Confirmation Email to Customer ---
                 $customer_email_subject = SITE_NAME . " - Order Confirmation #" . $new_order_id;
                 $customer_email_body = "Hello " . htmlspecialchars($user_first_name) . ",\n\n";
                 $customer_email_body .= "Thank you for your order! Your order #" . $new_order_id . " has been placed successfully.\n\n";
-                $customer_email_body .= "You can view your order details here: " . get_asset_url("order_detail.php?order_id=" . $new_order_id) . "\n\n"; // Use get_asset_url
+                $customer_email_body .= "You can view your order details here: " . get_asset_url("order_detail.php?order_id=" . $new_order_id) . "\n\n";
                 $customer_email_body .= "Total Amount: " . CURRENCY_SYMBOL . number_format($grand_total_checkout, 2) . "\n\n";
                 $customer_email_body .= "We will notify you once your items are shipped.\n\n";
                 $customer_email_body .= "Regards,\n" . SITE_NAME . " Team";
-
                 send_email($user_email, $customer_email_subject, $customer_email_body);
 
 
-                // --- Send New Order Notification to Brand Admins ---
                 foreach ($brand_admin_emails_for_notification as $brand_id_notif => $admin_email_notif) {
                     $brand_name_notif = '';
                     $stmt_brand_name = $db->prepare("SELECT brand_name FROM brands WHERE brand_id = :brand_id LIMIT 1");
@@ -341,18 +360,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                     if ($brand_name_result) {
                         $brand_name_notif = " for Brand " . htmlspecialchars($brand_name_result['brand_name']);
                     }
-
                     $brand_admin_subject = SITE_NAME . " - New Order Received (Order #{$new_order_id}){$brand_name_notif}";
                     $brand_admin_body = "Hello Brand Admin,\n\n";
                     $brand_admin_body .= "A new order (#{$new_order_id}) has been placed on " . SITE_NAME . " that includes products from your brand.\n\n";
                     $brand_admin_body .= "Please log in to your Brand Admin Panel to view the order details and update item statuses:\n";
-                    $brand_admin_body .= get_asset_url("brand_admin/order_detail.php?order_id=" . $new_order_id) . "\n\n"; // Use get_asset_url
+                    $brand_admin_body .= get_asset_url("brand_admin/order_detail.php?order_id=" . $new_order_id) . "\n\n";
                     $brand_admin_body .= "Regards,\n" . SITE_NAME . " Team";
-
                     send_email($admin_email_notif, $brand_admin_subject, $brand_admin_body);
                 }
 
-                header("Location: " . get_asset_url("order_success.php")); // Use get_asset_url
+                header("Location: " . get_asset_url("order_success.php"));
                 exit;
 
             } catch (PDOException $e) {
@@ -361,7 +378,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                 $errors['database'] = "An error occurred while placing your order. Please try again.";
             }
         }
-        // If errors occurred during POST validation, repopulate form fields
         if (!empty($errors)) {
             $user_shipping_info['shipping_name_form'] = $shipping_name_post;
             $user_shipping_info['phone_number'] = $shipping_phone_post;
@@ -387,7 +403,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
          <?php if (!empty($errors['address_fetch'])): ?>
             <div class="form-message warning-message"><?php echo esc_html($errors['address_fetch']); ?></div>
         <?php endif; ?>
-        <?php if (!empty($errors['final_stock_check'])): // This error would typically redirect, but shown if not ?>
+        <?php if (!empty($errors['final_stock_check'])): ?>
             <div class="form-message error-message"><?php echo esc_html($errors['final_stock_check']); ?></div>
         <?php endif; ?>
          <?php if (!empty($errors['stock_update_failed'])): ?>
@@ -398,8 +414,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
         <div class="checkout-layout">
             <div class="checkout-form-container">
                 <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="POST" class="checkout-form auth-form" novalidate>
-                    <fieldset>
-                        <legend>Shipping Information</legend>
+                    
+                    <div class="form-section">
+                        <h3 class="form-section-title">Shipping Information</h3>
                         <div class="form-group">
                             <label for="shipping_name">Full Name <span class="required">*</span></label>
                             <input type="text" id="shipping_name" name="shipping_name" value="<?php echo esc_html($user_shipping_info['shipping_name_form']); ?>" required>
@@ -438,10 +455,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                             <input type="text" id="shipping_country" name="shipping_country" value="<?php echo esc_html($user_shipping_info['shipping_country']); ?>" required>
                              <?php if (isset($errors['shipping_country'])): ?><span class="error-text"><?php echo esc_html($errors['shipping_country']); ?></span><?php endif; ?>
                         </div>
-                    </fieldset>
+                    </div>
 
-                    <fieldset>
-                        <legend>Payment Method</legend>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Payment Method</h3>
                         <div class="form-group">
                             <label for="payment_method_cod">
                                 <input type="radio" id="payment_method_cod" name="payment_method" value="cod" <?php echo (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cod' || !isset($_POST['payment_method'])) ? 'checked' : ''; ?> required>
@@ -450,15 +467,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                             <?php if (isset($errors['payment_method'])): ?><span class="error-text d-block"><?php echo esc_html($errors['payment_method']); ?></span><?php endif; ?>
                             <small class="form-text text-muted">Other payment methods will be available soon.</small>
                         </div>
-                    </fieldset>
+                    </div>
 
-                    <fieldset>
-                        <legend>Order Notes (Optional)</legend>
+                    <div class="form-section">
+                        <h3 class="form-section-title">Order Notes (Optional)</h3>
                         <div class="form-group">
                             <label for="notes_to_seller">Special instructions for your order?</label>
                             <textarea id="notes_to_seller" name="notes_to_seller" rows="3" class="form-control"><?php echo esc_html($user_shipping_info['notes_to_seller']); ?></textarea>
                         </div>
-                    </fieldset>
+                    </div>
 
                     <div class="form-group mt-4">
                         <button type="submit" name="place_order" class="btn btn-primary btn-lg btn-block" <?php if (!empty($errors['database']) || !empty($errors['cart_stock']) || !empty($errors['cart_availability'])) echo 'disabled'; ?>>Place Order</button>
@@ -487,11 +504,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                         <?php endif; ?>
                         <hr>
                         <p class="grand-total"><strong>Total:</strong> <strong><?php echo CURRENCY_SYMBOL . esc_html(number_format($grand_total_checkout, 2)); ?></strong></p>
-                    <?php elseif (empty($errors)): // Only show "cart is empty" if no other critical errors ?>
+                    <?php elseif (empty($errors['database']) && empty($errors['cart_stock']) && empty($errors['cart_availability'])): // Only show "cart is empty" if no other critical errors ?>
                         <p>Your cart is empty or items are unavailable.</p>
                     <?php endif; ?>
                 </div>
-                <?php if (!empty($cart_items_details_checkout) || empty($errors)): // Show return to cart link if cart had items or no major errors ?>
+                <?php if (!empty($cart_items_details_checkout) || (empty($errors['database']) && empty($errors['cart_stock']) && empty($errors['cart_availability'])) ): // Show return to cart link if cart had items or no major errors ?>
                 <p class="text-center mt-3"><a href="<?php echo get_asset_url('cart.php'); ?>">&laquo; Return to Cart</a></p>
                 <?php endif; ?>
             </div>
@@ -506,4 +523,6 @@ if (file_exists($footer_path)) {
 } else {
     die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path));
 }
+
+ob_end_flush(); // Flush the output buffer at the very end
 ?>

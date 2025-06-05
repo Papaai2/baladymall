@@ -6,6 +6,72 @@ ini_set('display_errors', 1); // Set to 0 in production for live site
 ini_set('display_startup_errors', 1); // Set to 0 in production for live site
 error_reporting(E_ALL); // Report all PHP errors
 
+// --- Custom Error and Exception Handling (for production robustness) ---
+// Define a default response for AJAX errors
+function get_default_ajax_error_response() {
+    return [
+        'success' => false,
+        'message' => 'An unexpected server error occurred. Please try again later.',
+        'type' => 'error'
+    ];
+}
+
+// Custom Error Handler: Convert PHP errors (warnings, notices) into exceptions
+// This allows errors to be caught by try-catch blocks.
+function custom_error_handler($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        // This error code is not included in error_reporting
+        return false;
+    }
+    // Throw an ErrorException, which can be caught by a standard catch(Exception $e)
+    throw new ErrorException($message, 0, $severity, $file, $line);
+}
+
+// Custom Exception Handler: Catch all uncaught exceptions (including fatal errors if registered early enough)
+function custom_exception_handler(Throwable $exception) {
+    // Log the error details
+    error_log(sprintf(
+        "Uncaught Exception: %s in %s:%d\nStack trace:\n%s",
+        $exception->getMessage(),
+        $exception->getFile(),
+        $exception->getLine(),
+        $exception->getTraceAsString()
+    ));
+
+    // Determine if it's an AJAX request
+    $is_ajax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+    $is_ajax_action = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && !isset($_POST['update_cart_all_btn'])); // As defined in cart.php
+
+    if ($is_ajax || $is_ajax_action) {
+        // For AJAX requests, output a generic JSON error
+        http_response_code(500); // Internal Server Error
+        header('Content-Type: application/json');
+        ob_clean(); // Clear any existing buffer content
+        echo json_encode(get_default_ajax_error_response());
+    } else {
+        // For regular HTML requests, display a generic error page or message
+        // In production, you might redirect to a friendly error page.
+        // For development, display a simple message.
+        if (ini_get('display_errors')) { // If display_errors is ON (development)
+            echo "<h1>Application Error</h1>";
+            echo "<p>An unexpected error occurred: " . htmlspecialchars($exception->getMessage()) . "</p>";
+            echo "<p>File: " . htmlspecialchars($exception->getFile()) . " Line: " . htmlspecialchars($exception->getLine()) . "</p>";
+            echo "<pre>" . htmlspecialchars($exception->getTraceAsString()) . "</pre>";
+        } else { // If display_errors is OFF (production)
+            http_response_code(500);
+            echo "<h1>An unexpected error occurred.</h1>";
+            echo "<p>We're sorry, but something went wrong. Please try again later.</p>";
+            // You could include a link to contact support or home page.
+        }
+    }
+    exit(); // Terminate script execution
+}
+
+// Register the custom handlers
+set_error_handler("custom_error_handler");
+set_exception_handler("custom_exception_handler");
+
+
 // --- Session Management ---
 // Ensure session is started only once per request.
 // This block should be at the very top of any file that uses sessions.
@@ -52,27 +118,16 @@ if (!defined('PROJECT_ROOT_PATH')) {
 }
 
 // **CRITICAL FIX: EXPLICITLY DEFINE YOUR PROJECT'S BASE URLS**
-// This bypasses any dynamic server variable issues.
+// This bypasses any dynamic server variable issues that cause incorrect path segment detection.
 // YOU MUST SET THESE MANUALLY TO MATCH YOUR EXACT XAMPP/WEB SERVER SETUP.
 // Example: If your project is at C:\xampp\htdocs\baladymall\
-// Then PROJECT_BASE_URL should be 'http://localhost/baladymall'
-// And SITE_URL should be 'http://localhost/baladymall/public'
-if (!defined('EXPLICIT_PROJECT_BASE_URL')) {
-    define('EXPLICIT_PROJECT_BASE_URL', 'http://localhost/baladymall'); // <<-- IMPORTANT: SET THIS EXACTLY
-}
-if (!defined('EXPLICIT_SITE_URL')) {
-    define('EXPLICIT_SITE_URL', EXPLICIT_PROJECT_BASE_URL . '/public'); // Derived from above
-}
-
-
-// Define SITE_URL (web-accessible URL for the public folder)
-if (!defined('SITE_URL')) {
-    define('SITE_URL', EXPLICIT_SITE_URL);
-}
-
-// Define the root URL for the entire project (web-accessible, e.g., http://localhost/baladymall)
+// Then PROJECT_BASE_URL should be 'https://localhost/baladymall' if you're forcing HTTPS.
+// If you're NOT forcing HTTPS locally, set it to 'http://localhost/baladymall'.
 if (!defined('PROJECT_BASE_URL')) {
-    define('PROJECT_BASE_URL', EXPLICIT_PROJECT_BASE_URL);
+    define('PROJECT_BASE_URL', 'https://localhost/baladymall'); // <<-- IMPORTANT: Changed to HTTPS
+}
+if (!defined('SITE_URL')) {
+    define('SITE_URL', PROJECT_BASE_URL . '/public'); // Derived from above
 }
 
 
@@ -167,9 +222,10 @@ if ($_settings_db_conn instanceof PDO) {
 
     if (!defined('PLATFORM_COMMISSION_RATE')) define('PLATFORM_COMMISSION_RATE', (float)get_site_setting($_settings_db_conn, 'platform_commission_rate', '10.00'));
 
-  // In config.php, as a temporary test if DB setting is the issue
-    if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', get_site_setting($_settings_db_conn, 'site_logo_url', SITE_URL . '/uploads/site/default_logo.png')); // Fallback from SITE_URL now available
-    if (!defined('FAVICON_PATH')) define('FAVICON_PATH', get_site_setting($_settings_db_conn, 'favicon_url', SITE_URL . '/favicon.ico')); // Fallback from SITE_URL now available
+    // SITE_LOGO_PATH: The value from DB should be relative to PUBLIC_UPLOADS_URL_BASE (e.g., 'site/default_logo.png')
+    // The get_asset_url function in header.php will then construct the full URL.
+    if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', get_site_setting($_settings_db_conn, 'site_logo_url', 'site/default_logo.png')); // FIX: Fallback simplified
+    if (!defined('FAVICON_PATH')) define('FAVICON_PATH', get_site_setting($_settings_db_conn, 'favicon_url', 'favicon.ico')); // FIX: Fallback simplified
 
 
     // SMTP Configuration (from DB settings or hardcoded defaults)
@@ -196,77 +252,9 @@ if ($_settings_db_conn instanceof PDO) {
     if (!defined('MAIL_FROM_NAME')) define('MAIL_FROM_NAME', 'BaladyMall');
 
     // Fallback for logo and favicon if DB is not available
-    if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', SITE_URL . '/uploads/site/default_logo.png');
-    if (!defined('FAVICON_PATH')) define('FAVICON_PATH', SITE_URL . '/favicon.ico');
+    if (!defined('SITE_LOGO_PATH')) define('SITE_LOGO_PATH', 'site/default_logo.png'); // FIX: Consistent fallback
+    if (!defined('FAVICON_PATH')) define('FAVICON_PATH', 'favicon.ico'); // FIX: Consistent fallback
 }
-
-// --- Email Sending Function (Simulated for local, PHPMailer for production) ---
-if (!function_exists('send_email')) {
-    function send_email($to_email, $subject, $body, $alt_body = '', $is_html = false) {
-        // For local development, just log the email content to the PHP error log.
-        error_log("--- EMAIL SENT (Simulated) ---\nTo: {$to_email}\nSubject: {$subject}\nBody:\n{$body}\n--- END EMAIL ---\n");
-        return true; // Always return true for simulation
-
-        /*
-        // --- PRODUCTION READY PHPMailer INTEGRATION EXAMPLE (Uncomment for live) ---
-        // You would need to ensure PHPMailer is installed (e.g., via Composer)
-        // and its autoloader is included in your main application bootstrap.
-        // require_once PROJECT_ROOT_PATH . '/vendor/autoload.php'; // If using Composer
-        // OR manually include:
-        // require_once PROJECT_ROOT_PATH . '/src/lib/PHPMailer/src/PHPMailer.php';
-        // require_once PROJECT_ROOT_PATH . '/src/lib/PHPMailer/src/SMTP.php';
-        // require_once PROJECT_ROOT_PATH . '/src/lib/PHPMailer/src/Exception.php';
-
-        // use PHPMailer\PHPMailer\PHPMailer;
-        // use PHPMailer\PHPMailer\Exception;
-        // use PHPMailer\PHPMailer\SMTP; // Needed for SMTP::DEBUG_SERVER etc.
-
-        // $mail = new PHPMailer(true); // Enable exceptions for error handling
-
-        // try {
-        //     // Server settings
-        //     $mail->isSMTP();
-        //     $mail->Host       = SMTP_HOST;
-        //     $mail->SMTPAuth   = true;
-        //     $mail->Username   = SMTP_USERNAME;
-        //     $mail->Password   = SMTP_PASSWORD;
-        //     // Use PHPMailer's constants for encryption
-        //     if (SMTP_ENCRYPTION === 'ssl') {
-        //         $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        //     } elseif (SMTP_ENCRYPTION === 'tls') {
-        //         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        //     } else {
-        //         $mail->SMTPSecure = false; // No encryption
-        //     }
-        //     $mail->Port       = SMTP_PORT;
-        //     $mail->CharSet    = 'UTF-8';
-        //     // $mail->SMTPDebug = SMTP::DEBUG_SERVER; // Uncomment for verbose SMTP debugging
-
-        //     // Recipients
-        //     $mail->setFrom(MAIL_FROM_ADDRESS, MAIL_FROM_NAME);
-        //     $mail->addAddress($to_email);
-
-        //     // Content
-        //     $mail->isHTML($is_html); // Set email format to HTML
-        //     $mail->Subject = $subject;
-        //     $mail->Body    = $body;
-        //     if ($alt_body) {
-        //         $mail->AltBody = $alt_body;
-        //     } else {
-        //         // Generate plain text from HTML if alt_body is not provided
-        //         $mail->AltBody = strip_tags($body);
-        //     }
-
-        //     $mail->send();
-        //     return true;
-        // } catch (Exception $e) {
-        //     error_log("Email sending failed to {$to_email}. Mailer Error: {$mail->ErrorInfo}");
-        //     return false;
-        // }
-        */
-    }
-}
-
 
 // --- Maintenance Mode Check ---
 // This check relies on site settings from the database.

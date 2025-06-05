@@ -10,7 +10,7 @@ body, h1, h2, h3, h4, h5, h6, p, ul, li, a, figure, figcaption, fieldset, legend
 }
 
 html {
-    scroll-behavior: smooth; /* Enables smooth scrolling for anchor links */
+    scroll-behavior: smooth;
 }
 
 body {
@@ -51,7 +51,6 @@ img {
 /* --- Header Styles --- */
 .site-header {
     background-color: #ffffff;
-    padding: 5px 0; /* Keep reduced padding */
     border-bottom: 1px solid #dee2e6;
     box-shadow: 0 2px 5px rgba(0,0,0,0.06);
     position: sticky;
@@ -59,21 +58,44 @@ img {
     z-index: 1000;
     width: 100%;
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
-    min-height: 105px; /* Ensure header has a fixed height that can contain the logo vertically */
 }
 
-.site-header.scrolled { /* Style for header when scrolled (JS adds this class) */
-    background-color: rgba(255, 255, 255, 0.97); /* Slightly transparent white */
+.site-header.scrolled {
+    background-color: rgba(255, 255, 255, 0.97);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-
-.site-header .container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center; /* Ensures vertical alignment */
+/* Optional: Top bar for promotions/announcements */
+.header-top-bar {
+    background-color: #f8f9fa;
+    padding: 8px 0;
+    font-size: 0.85em;
+    color: #6c757d;
+    text-align: center;
+    border-bottom: 1px solid #e9ecef;
+}
+.header-top-bar .promo-message {
+    margin: 0;
 }
 
+
+/* Main header row: Logo | Navigation | Actions */
+.header-main {
+    padding: 15px 0;
+}
+.header-main .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.site-logo {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
 .site-logo h1 {
     font-size: 1.8em;
     font-weight: 700;
@@ -82,65 +104,85 @@ img {
 }
 .site-logo a {
     text-decoration: none;
+    color: inherit;
 }
 
-/* FIX: Style for the logo image - This will distort the logo */
 .site-logo-image {
-    height: 95px;   /* FIXED: Set the height to fill the available vertical space within the header (105px - 5px - 5px padding) */
-    width: 180px;  /* FIXED: Set a specific width. Adjust this value to control horizontal expansion. */
-                   /* WARNING: If this width is not proportional to the height of 95px, the logo WILL BE DISTORTED. */
-    display: block;
-    object-fit: fill; /* FORCES the image to fill the exact height and width, distorting if aspect ratio differs */
+    height: 40px;
+    width: auto;
+    max-width: 120px;
+    object-fit: contain;
+    margin-right: 10px;
 }
 
-
-.main-navigation ul,
-.header-actions ul {
+/* Main Navigation */
+.main-navigation {
+    flex-grow: 1;
+    text-align: center;
+}
+.main-navigation ul {
     list-style: none;
     display: flex;
-    align-items: center;
+    justify-content: center;
     padding-left: 0;
+    margin: 0;
+    flex-wrap: wrap;
 }
-
-.main-navigation li,
-.header-actions li {
-    margin-left: 22px;
+.main-navigation li {
+    margin: 0 15px;
 }
-.main-navigation li:first-child,
-.header-actions li:first-child {
-    margin-left: 0;
-}
-
-
-.main-navigation a,
-.header-actions a {
+.main-navigation a {
     text-decoration: none;
     color: #495057;
     font-weight: 500;
-    padding: 8px 0;
+    padding: 10px 0;
     position: relative;
+    display: block;
 }
-
 .main-navigation a::after {
     content: '';
     position: absolute;
     width: 0;
     height: 2px;
-    bottom: -2px;
-    left: 0;
+    bottom: 0px;
+    left: 50%;
+    transform: translateX(-50%);
     background-color: #007bff;
     transition: width 0.3s ease-in-out;
 }
 .main-navigation a:hover::after,
-.main-navigation a.active::after { /* Add .active class via PHP for current page */
+.main-navigation a.active::after {
     width: 100%;
 }
 .main-navigation a:hover,
-.header-actions a:hover {
+.main-navigation a.active {
     color: #007bff;
     text-decoration: none;
 }
 
+/* Header Actions (Profile, Logout, Cart) */
+.header-actions {
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.header-actions ul {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    padding-left: 0;
+    margin: 0;
+}
+.header-actions li {
+    margin-left: 20px;
+}
+.header-actions a {
+    color: #495057;
+    font-weight: 500;
+    padding: 8px 0;
+}
+.header-actions a:hover {
+    color: #007bff;
+}
 
 .cart-count {
     background-color: #007bff;
@@ -153,9 +195,160 @@ img {
     font-weight: bold;
 }
 
+/* Search Bar Area */
+.header-search-area {
+    padding: 15px 0;
+    background-color: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+}
+.header-search-area .container {
+    display: flex;
+    justify-content: center;
+}
+
+.search-form {
+    display: flex;
+    width: 100%;
+    max-width: 700px;
+    border: 1px solid #007bff;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.search-form input[type="search"] {
+    flex-grow: 1;
+    padding: 10px 15px;
+    border: none;
+    font-size: 1em;
+    outline: none;
+}
+.search-form input[type="search"]::placeholder {
+    color: #888;
+}
+.search-form input[type="search"]:focus {
+    box-shadow: inset 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+.search-form button[type="submit"] {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    font-size: 1em;
+    flex-shrink: 0;
+}
+.search-form button[type="submit"]:hover {
+    background-color: #0056b3;
+}
+
+
+/* --- Mobile Responsiveness for Header --- */
+@media (max-width: 991px) { /* Tablets and smaller desktops */
+    .header-main .container {
+        flex-direction: column;
+        align-items: center;
+        padding-top: 15px;
+        padding-bottom: 15px;
+    }
+
+    .site-logo {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 15px;
+    }
+    .site-logo-image {
+        height: 35px;
+        max-width: 110px;
+    }
+
+    .main-navigation {
+        width: 100%;
+        margin-bottom: 15px;
+        order: 2; /* Put navigation below actions on smaller screens */
+    }
+    .main-navigation ul {
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .main-navigation li {
+        margin: 0;
+    }
+    .main-navigation a {
+        padding: 8px 12px;
+        font-size: 0.95em;
+    }
+    .main-navigation a::after {
+        display: none;
+    }
+
+
+    .header-actions {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+        margin-bottom: 15px;
+        order: 1; /* Put actions above nav on smaller screens */
+    }
+    .header-actions ul {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .header-actions li {
+        margin: 0;
+    }
+
+    .header-search-area {
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+    .search-form {
+        max-width: 95%;
+    }
+}
+
+@media (max-width: 767px) { /* Smaller phones */
+    .header-top-bar {
+        padding: 5px 0;
+        font-size: 0.8em;
+    }
+    .site-logo-image {
+        height: 30px;
+        max-width: 100px;
+    }
+    .header-main .container {
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+    .main-navigation ul {
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+    }
+    .main-navigation li {
+        width: 100%;
+        text-align: center;
+    }
+    .main-navigation a {
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .main-navigation li:last-child a {
+        border-bottom: none;
+    }
+    .search-form {
+        max-width: 100%;
+    }
+}
+
+
 /* --- Main Content Area --- */
 .site-main {
-    padding-bottom: 10px !important;
+    padding-bottom: 30px;
+    flex-grow: 1;
+}
+.site-main .container {
+    padding-top: 30px;
 }
 
 
@@ -163,7 +356,7 @@ img {
 .site-footer {
     background-color: #2c3e50;
     color: #e9ecef;
-    padding: 30px 0 20px; /* Made slightly smaller */
+    padding: 30px 0 20px;
     border-top: 4px solid #007bff;
 }
 
@@ -179,12 +372,12 @@ img {
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
-    margin-bottom: 25px; /* Reduced margin */
+    margin-bottom: 25px;
 }
 
 .footer-widget {
     width: 100%;
-    margin-bottom: 20px; /* Reduced margin */
+    margin-bottom: 20px;
     padding: 0 12px;
 }
 .footer-widget ul {
@@ -213,38 +406,36 @@ img {
 
 .footer-widget h4 {
     color: #ffffff;
-    margin-bottom: 15px; /* Reduced margin */
-    font-size: 1.15em; /* Slightly smaller */
+    margin-bottom: 15px;
+    font-size: 1.15em;
     font-weight: 600;
     border-bottom: 1px solid #4a5c6a;
-    padding-bottom: 8px; /* Reduced padding */
+    padding-bottom: 8px;
 }
 
 .footer-widget ul li {
-    margin-bottom: 8px; /* Reduced margin */
+    margin-bottom: 8px;
 }
 
-/* FIX: Moved social media link styles from header.php inline styles */
 .social-media-links a {
     margin-right: 15px;
     display: inline-block;
     text-decoration: none;
 }
-/* FIX: Moved social media SVG fill color from header.php inline styles */
 .social-media-links svg {
-    fill: #ced4da; /* Default fill color for icons */
-    transition: fill 0.2s ease-in-out; /* Keep transition for hover effect */
+    fill: #ced4da;
+    transition: fill 0.2s ease-in-out;
 }
 .social-media-links a:hover svg {
-    fill: #ffffff; /* Change icon color on hover */
+    fill: #ffffff;
 }
 
 
 .copyright-area {
     text-align: center;
-    padding-top: 20px; /* Reduced padding */
+    padding-top: 20px;
     border-top: 1px solid #4a5c6a;
-    font-size: 0.85em; /* Slightly smaller */
+    font-size: 0.85em;
 }
 .copyright-area p {
     margin-bottom: 5px;
@@ -436,6 +627,7 @@ img {
     font-size: 2.5em; /* Match user's inline style */
 }
 
+
 /* --- PERMANENT GRID FIX (for any number of items) --- */
 /* This is the crucial part that will fix the layout for any number of items */
 .category-grid,
@@ -516,8 +708,9 @@ img {
 }
 /* Specific for brand logos if they need different aspect ratio or object-fit */
 .product-item.brand-card-item > a > img { /* Add .brand-card-item to brand items in PHP if needed */
-    object-fit: contain; /* Better for logos that shouldn't be cropped */
-    aspect-ratio: 16/9;  /* Or another common logo aspect ratio, or 'auto' if varied */
+    object-fit: contain;
+    aspect-ratio: 16/9;
+    padding: 5px;
 }
 
 
@@ -667,41 +860,8 @@ img {
     font-size: 1.05em;
 }
 
-.auth-form fieldset,
-.profile-edit-form fieldset,
-.change-password-form fieldset,
-.shipping-address-form fieldset,
-.checkout-form fieldset,
-.contact-form fieldset { /* Added for contact form */
-    border: none;
-    padding: 0;
-    margin-bottom: 20px;
-}
-.auth-form fieldset:first-of-type,
-.profile-edit-form fieldset:first-of-type,
-.change-password-form fieldset:first-of-type,
-.shipping-address-form fieldset:first-of-type,
-.checkout-form fieldset:first-of-type,
-.contact-form fieldset:first-of-type {
-    padding-top: 0;
-}
-
-
-.auth-form legend,
-.profile-edit-form legend,
-.change-password-form legend,
-.shipping-address-form legend,
-.checkout-form legend,
-.contact-form legend { /* Added for contact form */
-    font-size: 1.3em;
-    font-weight: 600;
-    color: #007bff;
-    padding: 0;
-    margin-bottom: 20px;
-    width: 100%;
-    border-bottom: 1px solid #e9ecef;
-    padding-bottom: 10px;
-}
+/* FIX: Removed explicit fieldset/legend styles here as they are removed from HTML */
+/* If you ever reintroduce fieldset/legend, you'll need to re-add specific styles */
 
 .form-group {
     margin-bottom: 20px;
@@ -731,18 +891,18 @@ img {
 .form-group input[type="number"],
 .form-group textarea,
 .form-group select,
-.form-control { /* Ensure .form-control gets these base styles */
-    display: block; /* Ensure .form-control is block */
+.form-control {
+    display: block;
     width: 100%;
-    padding: 12px 15px; /* Default padding */
-    font-size: 1em; /* Default font size */
+    padding: 12px 15px;
+    font-size: 1em;
     font-weight: 400;
     line-height: 1.5;
     color: #495057;
     background-color: #fff;
     background-clip: padding-box;
     border: 1px solid #ced4da;
-    border-radius: 6px; /* Default border radius */
+    border-radius: 6px;
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
 
@@ -789,7 +949,7 @@ img {
 .change-password-form.submitted input:invalid,
 .shipping-address-form.submitted input:invalid,
 .checkout-form.submitted input:invalid,
-.contact-form.submitted input:invalid, /* Added for contact form */
+.contact-form.submitted input:invalid,
 .form-control:invalid {
     border-color: #e74c3c;
 }
@@ -798,7 +958,7 @@ img {
 .change-password-form.submitted input:invalid:focus,
 .shipping-address-form.submitted input:invalid:focus,
 .checkout-form.submitted input:invalid:focus,
-.contact-form.submitted input:invalid:focus, /* Added for contact form */
+.contact-form.submitted input:invalid:focus,
 .form-control:invalid:focus {
     box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
 }
@@ -1097,7 +1257,7 @@ img {
     transform: translateY(0);
 }
 
-/* Custom Alert/Message Box Styles (FIXED for centering and padding) */
+/* Custom Alert/Message Box Styles */
 .custom-message-box {
     position: fixed;
     top: -100px;
@@ -1105,13 +1265,13 @@ img {
     transform: translateX(-50%);
     min-width: 300px;
     max-width: 90%;
-    padding: 15px 20px; /* Padding for the box itself */
+    padding: 15px 20px;
     border-radius: 6px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.15);
     z-index: 10001;
     display: flex;
-    justify-content: center; /* Center horizontally */
-    align-items: center; /* Center vertically */
+    justify-content: center;
+    align-items: center;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.4s ease-in-out, top 0.4s ease-in-out, visibility 0s linear 0.4s;
@@ -1124,10 +1284,9 @@ img {
 }
 
 .custom-message-box span {
-    flex-grow: 0; /* Don't grow, let content width define it */
-    padding-right: 0; /* REMOVE THIS PADDING - it conflicts with centering */
-    text-align: center; /* Center the text inside the span */
-    padding: 0; /* Remove any default padding */
+    flex-grow: 0;
+    text-align: center;
+    padding: 0;
 }
 .custom-message-box .close-custom-message {
     background: none;
@@ -1137,10 +1296,10 @@ img {
     color: inherit;
     opacity: 0.6;
     cursor: pointer;
-    padding: 0 5px; /* Add specific padding for the close button */
+    padding: 0 5px;
     transition: opacity 0.2s ease;
-    flex-shrink: 0; /* Prevent close button from shrinking */
-    margin-left: 10px; /* Add margin to separate from text */
+    flex-shrink: 0;
+    margin-left: 10px;
 }
 .custom-message-box .close-custom-message:hover {
     opacity: 1;
@@ -1609,4 +1768,3 @@ img {
     .order-items-table td.text-center {
         text-align: right !important; /* Force text alignment for data cells */
     }
-}

@@ -24,13 +24,13 @@ $all_products = [];
 $page_error_message = '';
 $category_name = ''; // To display the category name in the title
 $brand_name = '';    // To display the brand name if filtered by brand
+$search_query = trim(filter_input(INPUT_GET, 'search', FILTER_UNSAFE_RAW) ?? ''); // NEW: Retrieve search term
 
-// --- NEW LOGIC: Filter by Category ID from URL ---
+// --- Filter by Category ID from URL ---
 $filter_category_id = null;
 if (isset($_GET['category_id']) && is_numeric($_GET['category_id'])) {
     $filter_category_id = (int)$_GET['category_id'];
-    // Try to fetch category name for title display
-    if ($db) { // Check DB connection before query
+    if ($db) {
         try {
             $stmt_cat = $db->prepare("SELECT category_name FROM categories WHERE category_id = ?");
             $stmt_cat->execute([$filter_category_id]);
@@ -41,17 +41,15 @@ if (isset($_GET['category_id']) && is_numeric($_GET['category_id'])) {
             }
         } catch (PDOException $e) {
             error_log("Error fetching category name: " . $e->getMessage());
-            // This error doesn't stop page render, just means category name might be missing
         }
     }
 }
 
-// --- NEW LOGIC: Filter by Brand ID from URL (similar to category filtering) ---
+// --- Filter by Brand ID from URL ---
 $filter_brand_id = null;
 if (isset($_GET['brand_id']) && is_numeric($_GET['brand_id'])) {
     $filter_brand_id = (int)$_GET['brand_id'];
-    // Try to fetch brand name for title display
-    if ($db) { // Check DB connection before query
+    if ($db) {
         try {
             $stmt_brand = $db->prepare("SELECT brand_name FROM brands WHERE brand_id = ?");
             $stmt_brand->execute([$filter_brand_id]);
@@ -62,10 +60,10 @@ if (isset($_GET['brand_id']) && is_numeric($_GET['brand_id'])) {
             }
         } catch (PDOException $e) {
             error_log("Error fetching brand name: " . $e->getMessage());
-            // This error doesn't stop page render, just means brand name might be missing
         }
     }
 }
+
 
 if ($db) { // Proceed with fetching products only if DB connection is available
     try {
@@ -98,6 +96,31 @@ if ($db) { // Proceed with fetching products only if DB connection is available
             $params[] = $filter_brand_id;
         }
 
+        // NEW: Add search conditions
+        if (!empty($search_query)) {
+            // Check if FULLTEXT index exists and use MATCH AGAINST for better relevance
+            // This is a simplified check. A more robust way might query information_schema or set a flag.
+            // Assuming you have added FULLTEXT(product_name, product_description)
+            $fulltext_search_sql = "MATCH (p.product_name, p.product_description) AGAINST (? IN BOOLEAN MODE)";
+            // Check if the search query contains very short words which might not work well with default FULLTEXT
+            // or if a specific minimum word length for FULLTEXT is set very high.
+            // For simple searches, a LIKE approach is also fine.
+            // For now, let's go with a hybrid or a preference for MATCH AGAINST if it's there.
+            
+            // For simplicity and common use, let's primarily use LIKE for basic search
+            // If FULLTEXT is properly configured and preferred:
+            // $conditions[] = $fulltext_search_sql;
+            // $params[] = '+' . str_replace(' ', '* +', $search_query) . '*'; // Boolean mode syntax
+
+            // Using LIKE for broader compatibility if FULLTEXT setup is unknown or for simpler cases
+            $conditions[] = "(p.product_name LIKE ? OR p.product_description LIKE ?)";
+            $params[] = '%' . $search_query . '%';
+            $params[] = '%' . $search_query . '%';
+
+            $page_title = "Search Results for '" . esc_html($search_query) . "' - BaladyMall";
+        }
+
+
         // Append all conditions to the SQL query
         if (!empty($conditions)) {
             $sql .= " WHERE " . implode(" AND ", $conditions);
@@ -125,7 +148,9 @@ if ($db) { // Proceed with fetching products only if DB connection is available
     <div class="container">
         <h2 class="section-title text-center mb-4">
             <?php
-            if ($category_name) {
+            if (!empty($search_query)) {
+                echo "Search Results for '" . esc_html($search_query) . "'";
+            } elseif ($category_name) {
                 echo esc_html($category_name) . " Products";
             } elseif ($brand_name) {
                 echo "Products by " . esc_html($brand_name);
@@ -143,9 +168,13 @@ if ($db) { // Proceed with fetching products only if DB connection is available
 
         <?php if (empty($all_products) && empty($page_error_message)): ?>
             <p class="text-center info-message" style="padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
-                No products found at the moment. Please check back soon!
-                <?php if ($category_name): ?> in this category.<?php endif; ?>
-                <?php if ($brand_name): ?> for this brand.<?php endif; ?>
+                <?php if (!empty($search_query)): ?>
+                    No products found matching "<?php echo esc_html($search_query); ?>".
+                <?php else: ?>
+                    No products found at the moment. Please check back soon!
+                    <?php if ($category_name): ?> in this category.<?php endif; ?>
+                    <?php if ($brand_name): ?> for this brand.<?php endif; ?>
+                <?php endif; ?>
             </p>
         <?php elseif (!empty($all_products)): ?>
             <div class="product-grid">
@@ -158,25 +187,26 @@ if ($db) { // Proceed with fetching products only if DB connection is available
                         $image_url = '';
                         $fallback_image_url_esc = '';
 
-                        // Use get_asset_url for image paths
+                        // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
+                        // Prefer a local 'no-image.png' as it's more reliable than external placeholders
+                        $fallback_image_url_esc = get_asset_url('images/no-image.png'); // Ensure this file exists in public/images/
+                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
+                            // If PLACEHOLDER_IMAGE_URL_GENERATOR is defined and preferred for errors
+                            $fallback_image_url_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x300/E0E0E0/777?text=No+Image");
+                        }
+
+
+                        // Correctly form the URL for the product image from database path
                         if (!empty($image_path)) {
                             if (filter_var($image_path, FILTER_VALIDATE_URL)) {
-                                $image_url = $image_path;
+                                $image_url = $image_path; // It's a full URL already, use as is
                             } else {
-                                $image_url = get_asset_url('uploads/products/' . ltrim($image_path, '/'));
+                                // Assuming $image_path is relative to public/uploads/ (e.g., 'products/image.jpg')
+                                $image_url = get_asset_url('uploads/' . ltrim($image_path, '/'));
                             }
                         }
 
-                        // Determine fallback image URL and ensure it's properly escaped for the onerror attribute
-                        if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
-                            $fallback_image_url_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x300/E0E0E0/777?text=No+Image");
-                        } else {
-                            // Fallback to a local 'no-image' if placeholder generator is not defined or empty
-                            // Ensure you have a 'no-image.png' in your 'public/images/' directory
-                            $fallback_image_url_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
-                        }
-
-                        // If main $image_url is still empty, set it to the fallback
+                        // If main $image_url is still empty, set it to the determined fallback
                         if (empty($image_url)) {
                             $image_url = $fallback_image_url_esc;
                         }
@@ -241,6 +271,6 @@ $footer_path_from_public = PROJECT_ROOT_PATH . '/src/includes/footer.php';
 if (file_exists($footer_path_from_public)) {
     require_once $footer_path_from_public;
 } else {
-    die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path_from_public));
+    die("CRITICAL ERROR: Footer file not found. Expected at: " . htmlspecialchars($footer_path_from_public));
 }
 ?>

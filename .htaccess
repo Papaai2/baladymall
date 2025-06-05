@@ -1,104 +1,130 @@
 # baladymall/.htaccess
 
 # ----------------------------------------------------------------------
-# | General Security Enhancements                                      |
+# | Essential Basic Configuration                                      |
 # ----------------------------------------------------------------------
 
 # Prevent directory listing
-# This prevents browsers from displaying the contents of directories if there's no index file.
 Options -Indexes
 
+# Set the default file to serve when a directory is requested (e.g., /public/)
+DirectoryIndex index.php index.html
+
+# ----------------------------------------------------------------------
+# | Security Enhancements (retained from previous versions)            |
+# ----------------------------------------------------------------------
+
 # Deny access to sensitive files and directories
-# Protects configuration files, Composer files, Git files, and source code.
-<FilesMatch "\.(env|json|lock|yml|yaml|sql)$">
+<FilesMatch "\.(env|lock|yml|yaml|sql)$">
     Require all denied
 </FilesMatch>
 <FilesMatch "^(composer\.json|composer\.lock|package\.json|package\.lock|webpack\.config\.js|gulpfile\.js|phpcs\.xml\.dist|phpunit\.xml\.dist|\.git|\.env)$">
     Require all denied
 </FilesMatch>
-# Deny access to the entire src/ directory
-RewriteRule ^src/ - [F,L]
-# Deny access to the entire admin/ directory from public access (only allow via direct URL for admin panel)
-# This is a general safeguard; auth_check.php handles the primary security.
-# RewriteRule ^admin/ - [F,L] # This might interfere with admin panel access, rely on auth_check.php instead.
-# Deny access to the entire brand_admin/ directory from public access (only allow via direct URL for brand admin panel)
-# RewriteRule ^brand_admin/ - [F,L] # This might interfere with brand admin panel access, rely on auth_check.php instead.
+
+# Prevent PHP from executing on static file types (crucial for image 500 errors)
+<FilesMatch "\.(js|css|gif|png|jpe?g|svg|ico|pdf|xml|json)$">
+    SetHandler none
+    <IfModule mod_php.c>
+        php_flag engine off
+    </IfModule>
+</FilesMatch>
 
 
 # ----------------------------------------------------------------------
-# | HTTPS Redirection                                                  |
+# | HTTPS Redirection (TEMPORARILY COMMENTED OUT FOR LOCAL DEV)        |
 # ----------------------------------------------------------------------
 
-# Force HTTPS
-# This redirects all HTTP requests to HTTPS.
-RewriteEngine On
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# RewriteEngine On
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 
 # ----------------------------------------------------------------------
-# | URL Rewriting for Public Folder Access                             |
+# | URL Rewriting (Hide .php Extension & Preserve AJAX POST)           |
 # ----------------------------------------------------------------------
-
-# This section ensures that all requests are routed through the 'public' directory,
-# effectively making 'public' your web root, while keeping other folders like 'src' inaccessible.
 
 RewriteEngine On
+# Set the base URL for rewrite rules. THIS IS CRUCIAL FOR SUBDIRECTORIES.
+# Example: If your site is http://localhost/baladymall/, use /baladymall/
+# If your site is http://localhost/, use /
+RewriteBase /baladymall/
 
-# Redirect requests for the root domain or project root to the public folder
-# Example: http://yourdomain.com/ -> http://yourdomain.com/public/
-# Or: http://localhost/baladymall/ -> http://localhost/baladymall/public/
-RewriteRule ^$ public/ [L]
+# 1. ALWAYS serve real files and directories directly.
+#    This is the #1 rule to protect AJAX POSTs and static assets from rewriting.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L] # If it's a real file or directory, stop rewrite processing.
 
-# Rewrite rules to internally redirect requests to the public folder
-# unless they are for the admin, brand_admin, or already in public.
-RewriteCond %{REQUEST_URI} !^/public/ [NC]
-RewriteCond %{REQUEST_URI} !^/admin/ [NC]
-RewriteCond %{REQUEST_URI} !^/brand_admin/ [NC]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ public/$1 [L]
+# 2. External Redirect: If accessing the project root (e.g., /baladymall/),
+#    redirect externally to /public/ for consistent main site entry.
+#    This rule will now use HTTP since HTTPS is commented out.
+RewriteRule ^$ public/ [L,R=301]
 
-# Rule to hide .php extension for files within the public/ directory
-# This should be placed AFTER the rule that routes everything to public/
+# 3. Internal Rewrite for Hiding .php Extensions:
+#    This rule will rewrite requests like /public/products to /public/products.php
+#    AND /products (after the root rewrite) to /public/products.php
+#    It applies IF the request URI (without .php) corresponds to a real .php file.
+#    This is a standard pattern for clean URLs in subdirectories.
 RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule ^public/(.*)$ public/$1.php [L]
-
-# For requests directly to a file in public/ without the .php extension (e.g. /login instead of /login.php)
-# This rule handles the clean URLs for the public-facing files.
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^([^/.]+)$ $1.php [L]
+RewriteRule ^(.*)$ $1.php [L]
 
 
 # ----------------------------------------------------------------------
-# | Security Headers (Recommended)                                     |
+# | Performance Enhancements (retained from previous versions)         |
 # ----------------------------------------------------------------------
 
-# X-Content-Type-Options: Prevents browsers from MIME-sniffing a response away from the declared content-type.
+# Gzip Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+
+# Browser Caching
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access 1 year"
+    ExpiresByType image/jpeg "access 1 year"
+    ExpiresByType image/gif "access 1 year"
+    ExpiresByType image/png "access 1 year"
+    ExpiresByType image/svg "access 1 year"
+    ExpiresByType text/css "access 1 month"
+    ExpiresByType application/javascript "access 1 month"
+    ExpiresByType application/x-javascript "access 1 month"
+    ExpiresByType text/html "access 1 hour"
+    ExpiresDefault "access 2 days"
+</IfModule>
+
+
+# ----------------------------------------------------------------------
+# | Custom Error Pages (retained from previous versions)               |
+# ----------------------------------------------------------------------
+
+ErrorDocument 400 /public/error/400.php
+ErrorDocument 401 /public/error/401.php
+ErrorDocument 403 /public/error/403.php
+ErrorDocument 404 /public/error/404.php
+ErrorDocument 500 /public/error/500.php
+
+
+# ----------------------------------------------------------------------
+# | Security Headers (retained from previous versions)                 |
+# ----------------------------------------------------------------------
+
 Header always set X-Content-Type-Options "nosniff"
-
-# X-Frame-Options: Prevents clickjacking by denying embedding in iframes.
-# Use "SAMEORIGIN" if you need to embed pages from the same domain.
 Header always set X-Frame-Options "DENY"
-
-# X-XSS-Protection: Enables the browser's built-in XSS filter.
 Header always set X-XSS-Protection "1; mode=block"
-
-# Referrer-Policy: Controls how much referrer information is included with requests.
-# "no-referrer-when-downgrade" is a good balance.
 Header always set Referrer-Policy "no-referrer-when-downgrade"
 
-# Content-Security-Policy (CSP): Advanced, but powerful.
-# This is a strict example. You will likely need to customize this heavily
-# to allow your specific scripts, styles, images, etc.
-# If you don't know exactly what to allow, it's safer to omit this
-# until you can properly configure it, as it can break your site.
-# Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:;"
-
-# Feature-Policy / Permissions-Policy (Newer, still evolving)
+# Optional Advanced Headers
+# Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:;"
 # Header always set Permissions-Policy "geolocation=(), microphone=()"
-
-# Strict-Transport-Security (HSTS): Forces browsers to use HTTPS for future visits.
-# Only enable this AFTER you are absolutely sure your site works perfectly over HTTPS.
 # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

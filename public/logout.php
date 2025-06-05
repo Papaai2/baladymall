@@ -1,9 +1,9 @@
 <?php
 // public/logout.php
 
-// The config file defines SITE_URL and SESSION_NAME
-// It's good practice to include it to ensure constants are available,
-// especially if session_name() was used.
+// The config file defines SITE_URL and SESSION_NAME, and handles session_start().
+// It's crucial to include it first to ensure all necessary constants and session management
+// are in place.
 $config_path_from_public = __DIR__ . '/../src/config/config.php';
 
 if (file_exists($config_path_from_public)) {
@@ -13,16 +13,9 @@ if (file_exists($config_path_from_public)) {
     die("Critical error: Main configuration file not found. Cannot process logout.");
 }
 
-// Ensure the session is properly initialized with the correct name
-// config.php already handles session_start() if not active,
-// so typically, it would be active by the time this script runs.
-if (defined('SESSION_NAME')) {
-    session_name(SESSION_NAME);
-}
-// The session should be started by config.php, but this check ensures it.
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
+// FIX: Removed the redundant session_name() and session_start() block.
+// config.php already handles session_start() and sets session_name() if SESSION_NAME is defined.
+// If the session is already active, calling session_name() again will cause the error.
 
 // 1. Unset all of the session variables.
 $_SESSION = array();
@@ -44,6 +37,6 @@ session_destroy();
 
 // 4. Redirect to login page (or homepage) with a success message.
 // Ensure SITE_URL is defined (from config.php)
-$redirect_url = get_asset_url('login.php?logout=success');
+$redirect_url = get_asset_url('login.php?logout=success'); // Using get_asset_url for consistency
 header("Location: " . $redirect_url);
 exit; // Important to prevent further script execution.

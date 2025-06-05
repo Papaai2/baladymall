@@ -21,7 +21,7 @@ if (file_exists($config_path_from_public)) {
 }
 
 // Now that config.php is loaded, SITE_URL and other constants like PROJECT_ROOT_PATH should be available.
-// Define header and footer paths using PROJECT_ROOT_PATH for robustness.
+// Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
 $header_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/header.php' : __DIR__ . '/../src/includes/header.php';
 $footer_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/footer.php' : __DIR__ . '/../src/includes/footer.php';
 
@@ -34,7 +34,7 @@ if (file_exists($header_path)) {
 
 // Redirect if user is already logged in
 if (isset($_SESSION['user_id'])) {
-    $redirect_url_if_already_loggedin = get_asset_url("my_account.php"); // Use get_asset_url
+    $redirect_url_if_already_loggedin = get_asset_url("my_account"); // Use get_asset_url (clean URL)
     header("Location: " . $redirect_url_if_already_loggedin);
     exit;
 }
@@ -57,7 +57,7 @@ $login_identifier = ''; // Initialize for repopulating form
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     $login_identifier = trim(filter_input(INPUT_POST, 'login_identifier', FILTER_UNSAFE_RAW));
-    $password = $_POST['password']; // Password will be verified, not directly used in SQL
+    $password = $_POST['password'] ?? ''; // Use null coalescing for safety
 
     if (empty($login_identifier)) {
         $errors['login_identifier'] = "Username or Email is required.";
@@ -97,8 +97,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
                     $_SESSION['last_name'] = $user['last_name'];
                     $_SESSION['phone_number'] = $user['phone_number'];
 
-                    // Determine redirect target. All roles go to public index after login.
-                    $redirect_target = get_asset_url("index.php?login=success"); // Use get_asset_url
+                    // Determine redirect target. All roles go to public index by default after login.
+                    $redirect_target = get_asset_url("index?login=success"); // Use get_asset_url (clean URL)
 
                     // Handle redirect after login if a destination was stored (e.g., from checkout)
                     if(isset($_SESSION['redirect_after_login'])) {
@@ -125,18 +125,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
 
 <section class="auth-form-section">
     <h2>Login to Your Account</h2>
-    <p>Welcome back to BaladyMall!</p>
+    <br><br>
 
     <?php if (isset($_GET['registered']) && $_GET['registered'] === 'success'): ?>
         <div class="form-message success-message">
             Registration successful! You can now login.
         </div>
     <?php endif; ?>
-    <?php if (isset($_GET['logout']) && $_GET['logout'] === 'success'): ?>
-        <div class="form-message success-message">
-            You have been successfully logged out.
-        </div>
-    <?php endif; ?>
+    <?php if (isset($_GET['logout']) && $_GET['logout'] === 'success'):
+        echo "<div class='form-message success-message'>You have been successfully logged out.</div>";
+    endif; ?>
      <?php if (isset($_GET['verified']) && $_GET['verified'] === 'success'): ?>
         <div class="form-message success-message">
             Email verified successfully! You can now login.
@@ -166,27 +164,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     <?php endif; ?>
 
     <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="POST" class="auth-form" novalidate>
-        <fieldset>
-            <legend>Login Credentials</legend>
-            <div class="form-group">
-                <label for="login_identifier">Username or Email Address <span class="required">*</span></label>
-                <input type="text" id="login_identifier" name="login_identifier" value="<?php echo esc_html($login_identifier); ?>" required aria-describedby="loginIdentifierError">
-                <?php if (isset($errors['login_identifier'])): ?><span id="loginIdentifierError" class="error-text"><?php echo esc_html($errors['login_identifier']); ?></span><?php endif; ?>
-            </div>
+        <?php // FIX: Removed fieldset and legend ?>
+        <div class="form-group">
+            <label for="login_identifier">Username or Email Address <span class="required">*</span></label>
+            <input type="text" id="login_identifier" name="login_identifier" value="<?php echo esc_html($login_identifier); ?>" required aria-describedby="loginIdentifierError">
+            <?php if (isset($errors['login_identifier'])): ?><span id="loginIdentifierError" class="error-text"><?php echo esc_html($errors['login_identifier']); ?></span><?php endif; ?>
+        </div>
 
-            <div class="form-group">
-                <label for="password">Password <span class="required">*</span></label>
-                <input type="password" id="password" name="password" required aria-describedby="passwordError">
-                <?php if (isset($errors['password'])): ?><span id="passwordError" class="error-text"><?php echo esc_html($errors['password']); ?></span><?php endif; ?>
-            </div>
-        </fieldset>
+        <div class="form-group">
+            <label for="password">Password <span class="required">*</span></label>
+            <input type="password" id="password" name="password" required aria-describedby="passwordError">
+            <?php if (isset($errors['password'])): ?><span id="passwordError" class="error-text"><?php echo esc_html($errors['password']); ?></span><?php endif; ?>
+        </div>
 
         <div class="form-group">
             <button type="submit" name="login" class="btn btn-primary btn-block btn-lg">Login</button>
         </div>
 
-        <p class="form-switch-link"><a href="<?php echo get_asset_url('forgot_password.php'); ?>">Forgot your password?</a></p>
-        <p class="form-switch-link">Don't have an account? <a href="<?php echo get_asset_url('register.php'); ?>">Register here</a>.</p>
+        <p class="form-switch-link"><a href="<?php echo get_asset_url('forgot_password'); ?>">Forgot your password?</a></p>
+        <p class="form-switch-link">Don't have an account? <a href="<?php echo get_asset_url('register'); ?>">Register here</a>.</p>
     </form>
 </section>
 
