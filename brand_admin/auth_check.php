@@ -54,11 +54,12 @@ $assigned_brand_id = null;
 $assigned_brand_name = null;
 
 // Ensure DB connection is available
+// FIX: Get DB connection here, as it's needed immediately below.
 $db = getPDOConnection();
 if (!$db) {
-    error_log("Brand Admin Auth: Database connection failed for brand_admin_user_id: {$brand_admin_user_id}. File: " . __FILE__ . " Line: " . __LINE__); // FIX: Add file/line
+    error_log("Brand Admin Auth: Database connection failed for brand_admin_user_id: {$brand_admin_user_id}. File: " . __FILE__ . " Line: " . __LINE__);
     // Redirect to login with error message if DB fails
-    $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>Database connection error. Please try again later.</div>"; // FIX: Consistent message key
+    $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>Database connection error. Please try again later.</div>";
     $login_url = rtrim(SITE_URL, '/') . '/login.php'; // Redirect to generic login
     header("Location: " . $login_url);
     exit;
@@ -67,6 +68,7 @@ if (!$db) {
 try {
     // If brand_id is already in session, and we're not force-refreshing, use it.
     // This avoids a DB query on every page load if brand is already established.
+    // This also helps prevent an issue where if brand is deleted, but user is logged in, it loops
     if (isset($_SESSION['brand_id']) && isset($_SESSION['brand_name'])) {
         $assigned_brand_id = $_SESSION['brand_id'];
         $assigned_brand_name = $_SESSION['brand_name'];
@@ -86,7 +88,6 @@ try {
             // Brand admin user is not assigned to any brand. This is an invalid state for a brand admin.
             // Log them out and redirect with an error.
             session_destroy(); // Clear session
-            // FIX: Consistent message key
             $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>Your Brand Admin account is not assigned to a brand. Please contact support.</div>";
             $login_url = rtrim(SITE_URL, '/') . '/login.php?reason=no_brand_assigned';
             header("Location: " . $login_url);
@@ -94,9 +95,9 @@ try {
         }
     }
 } catch (PDOException $e) {
-    error_log("Brand Admin Auth - Error fetching assigned brand for user {$brand_admin_user_id}: " . $e->getMessage() . " File: " . __FILE__ . " Line: " . __LINE__); // FIX: Add file/line
+    error_log("Brand Admin Auth - Error fetching assigned brand for user {$brand_admin_user_id}: " . $e->getMessage() . " File: " . __FILE__ . " Line: " . __LINE__);
     session_destroy(); // Clear session on critical DB error
-    $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>A critical database error occurred during brand assignment check. Please try again later.</div>"; // FIX: Consistent message key
+    $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>A critical database error occurred during brand assignment check. Please try again later.</div>";
     $login_url = rtrim(SITE_URL, '/') . '/login.php';
     header("Location: " . $login_url);
     exit;
@@ -104,7 +105,7 @@ try {
 
 // Ensure $_SESSION['brand_id'] is truly set before allowing script to continue.
 // If brand_info was not found (and not redirected) or if $assigned_brand_id is somehow null
-if (empty($assigned_brand_id)) {
+if (empty($assigned_brand_id)) { // This should ideally be caught by the block above
     session_destroy();
     $_SESSION['brand_admin_message'] = "<div class='brand-admin-message error'>Could not determine your assigned brand. Please contact support.</div>";
     $login_url = rtrim(SITE_URL, '/') . '/login.php';
@@ -112,7 +113,7 @@ if (empty($assigned_brand_id)) {
     exit;
 }
 
-// These are now guaranteed to be set
+// These are now guaranteed to be set in session and as local variables
 $_SESSION['brand_id'] = $assigned_brand_id;
 $_SESSION['brand_name'] = $assigned_brand_name;
 

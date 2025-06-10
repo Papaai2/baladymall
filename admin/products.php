@@ -347,7 +347,7 @@ if (isset($_SESSION['admin_message'])) {
                         <td><?php echo htmlspecialchars($product['product_id']); ?></td>
                         <td><?php echo htmlspecialchars($product['product_name'] ?? ''); ?></td>
                         <td><?php echo htmlspecialchars($product['brand_name'] ?? 'N/A'); ?> (ID: <?php echo htmlspecialchars($product['brand_id'] ?? 'N/A'); ?>)</td>
-                        <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$product['price'], 2)); ?></td>
+                        <td><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$product['price'], 2)); ?></td>
                         <td><?php echo htmlspecialchars($product['stock_quantity'] ?? '0'); ?></td>
                         <td>
                             <span class="status-<?php echo $product['is_active'] ? 'active' : 'inactive'; ?>">

@@ -106,7 +106,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_product'])) {
     $compare_at_price_form = ($compare_at_price_input === '' || $compare_at_price_input === null) ? null : filter_var($compare_at_price_input, FILTER_VALIDATE_FLOAT);
     $stock_quantity_form = ($stock_quantity_input === '' || $stock_quantity_input === null) ? 0 : filter_var($stock_quantity_input, FILTER_VALIDATE_INT, ["options" => ["min_range"=>0]]);
 
-    $is_active_form = isset($_POST['is_active']) ? 1 : 0;
+    $is_active_form = $product['is_active']; // Default to the currently saved value
+if (isset($_POST['update_product'])) {
+    $is_active_form = isset($_POST['is_active']) ? 1 : 0; // On form submission, use the new value
+}
     $requires_variants_form = isset($_POST['requires_variants']) ? 1 : 0;
 
     // Basic Validation (similar to add_product.php)
@@ -360,13 +363,13 @@ $admin_page_title = "Edit Product: " . htmlspecialchars($product['product_name']
         <legend>Pricing & Stock (for Simple Products)</legend>
         <small>If "Requires Variants" is checked, these might be overridden by variant-specific values.</small>
         <div class="form-group">
-            <label for="price">Price (<?php echo CURRENCY_SYMBOL; ?>) <span class="price-stock-label-note"><?php echo $requires_variants_form ? '(Optional if variants define price)' : '<span style="color:red;">*</span>'; ?></span></label>
+            <label for="price">Price (<?php echo $GLOBALS['currency_symbol']; ?>) <span class="price-stock-label-note"><?php echo $requires_variants_form ? '(Optional if variants define price)' : '<span style="color:red;">*</span>'; ?></span></label>
             <input type="number" id="price" name="price" value="<?php echo htmlspecialchars($price_form ?? ''); ?>" step="0.01" min="0" placeholder="e.g., 199.99">
             <?php if (isset($errors['price'])): ?><small style="color:red;"><?php echo $errors['price']; ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
-            <label for="compare_at_price">Compare at Price (<?php echo CURRENCY_SYMBOL; ?>)</label>
+            <label for="compare_at_price">Compare at Price (<?php echo $GLOBALS['currency_symbol']; ?>)</label>
             <input type="number" id="compare_at_price" name="compare_at_price" value="<?php echo htmlspecialchars($compare_at_price_form ?? ''); ?>" step="0.01" min="0" placeholder="Optional 'was' price">
             <?php if (isset($errors['compare_at_price'])): ?><small style="color:red;"><?php echo $errors['compare_at_price']; ?></small><?php endif; ?>
         </div>

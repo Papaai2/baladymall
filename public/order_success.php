@@ -54,6 +54,9 @@ $user_id = (int)$_SESSION['user_id'];
 
 // Retrieve the last order ID from the session
 if (isset($_SESSION['last_order_id'])) {
+    // REMOVED: The send_email call from here. Email is now sent from checkout.php.
+    // This prevents duplicate emails if the user refreshes order_success.php.
+
     $last_order_id = (int)$_SESSION['last_order_id'];
 
     if ($db_available) {
@@ -124,14 +127,12 @@ if (isset($_SESSION['last_order_id'])) {
                 <div class="order-summary-brief">
                     <p><strong>Order ID:</strong> #<?php echo esc_html($order_details['order_id']); ?></p>
                     <p><strong>Order Date:</strong> <?php echo esc_html(date("F j, Y, g:i a", strtotime($order_details['order_date']))); ?></p>
-                    <p><strong>Total Amount:</strong> <?php echo CURRENCY_SYMBOL . esc_html(number_format($order_details['total_amount'], 2)); ?></p>
+                    <p><strong>Total Amount:</strong> <?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($order_details['total_amount'], 2)); ?></p>
                     <p><strong>Shipping To:</strong> <?php echo esc_html($order_details['shipping_name']); ?></p>
                     <p><strong>Payment Method:</strong> <?php echo esc_html(ucwords(str_replace('_', ' ', $order_details['payment_method']))); ?></p>
                 </div>
 
-                <p class="mt-4">You will receive an email confirmation shortly with the full details of your order. <br>
-                   (Note: Email sending functionality is not yet implemented in this version.)</p>
-
+                <p class="mt-4">You will receive an email confirmation shortly with the full details of your order.</p>
                 <p>If you have any questions, please don't hesitate to <a href="<?php echo get_asset_url('contact.php'); ?>">contact us</a>.</p>
 
                 <div class="confirmation-actions">

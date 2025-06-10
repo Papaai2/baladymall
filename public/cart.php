@@ -7,9 +7,9 @@ ob_start();
 // These error settings are for development. In production, they should typically be Off or logged to a file.
 // These will be overridden for AJAX requests later.
 // Note: config.php also sets error reporting, which will take precedence after it's included.
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
 
 // --- CRITICAL: Load config.php directly and unconditionally at the very beginning ---
 $config_path_from_public = __DIR__ . '/../src/config/config.php';
@@ -51,9 +51,9 @@ if ($is_definitely_ajax) {
     }
     // For AJAX requests, suppress error display and report no errors directly to output.
     // Errors will still be logged if configured in php.ini (via config.php's handlers).
-    ini_set('display_errors', 0);
-    ini_set('display_startup_errors', 0);
-    error_reporting(0);
+   // ini_set('display_errors', 0);
+   // ini_set('display_startup_errors', 0);
+   // error_reporting(0);
 
     header('Content-Type: application/json');
     // Initialize a default response. Specific actions will modify or replace this.
@@ -511,7 +511,7 @@ if (!$is_definitely_ajax) {
                                         <small class="text-muted d-block">(Variant details TBD)</small>
                                      <?php endif; ?>
                                 </td>
-                                <td class="cart-item-price text-right" data-label="Price"><?php echo CURRENCY_SYMBOL . esc_html(number_format($item['price'], 2)); ?></td>
+                                <td class="cart-item-price text-right" data-label="Price"><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($item['price'], 2)); ?></td>
                                 <td class="cart-item-quantity text-center" data-label="Quantity">
                                     <input type="number" name="quantity[<?php echo esc_html($item['id']); ?>]"
                                            value="<?php echo esc_html($item['quantity']); ?>"
@@ -520,7 +520,7 @@ if (!$is_definitely_ajax) {
                                            class="form-control form-control-sm quantity-input"
                                            aria-label="Quantity for <?php echo esc_html($item['name']); ?>">
                                 </td>
-                                <td class="cart-item-line-total text-right" data-label="Total"><?php echo CURRENCY_SYMBOL . esc_html(number_format($item['line_total'], 2)); ?></td>
+                                <td class="cart-item-line-total text-right" data-label="Total"><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($item['line_total'], 2)); ?></td>
                                 <td class="cart-item-remove text-center" data-label="Remove">
                                     <a href="<?php echo get_asset_url('cart.php?action=remove&product_id=' . esc_html($item['id'])); ?>"
                                        class="btn btn-sm btn-danger remove-item-btn"
@@ -547,10 +547,10 @@ if (!$is_definitely_ajax) {
                         </button>
                     </div>
                     <div class="cart-totals">
-                        <p><strong>Subtotal:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($cart_subtotal, 2)); ?></span></p>
+                        <p><strong>Subtotal:</strong> <span><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($cart_subtotal, 2)); ?></span></p>
                         <p><strong>Items in Cart:</strong> <span><?php echo esc_html($cart_total_items); ?></span></p>
                         <hr>
-                        <p class="grand-total"><strong>Total:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($grand_total, 2)); ?></span></p>
+                        <p class="grand-total"><strong>Total:</strong> <span><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($grand_total, 2)); ?></span></p>
                         <a href="<?php echo get_asset_url('checkout.php'); ?>" class="btn btn-primary btn-lg btn-block mt-3">
                             Proceed to Checkout
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-arrow-right-circle-fill" viewBox="0 0 16 16" style="margin-left:8px; vertical-align: text-bottom;">

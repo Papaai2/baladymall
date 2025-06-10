@@ -142,7 +142,7 @@ try {
 <div class="stat-cards-container">
     <div class="stat-card total-sales">
         <h3>Total Brand Revenue</h3>
-        <p class="stat-value"><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format($total_brand_sales, 2)); ?></p>
+        <p class="stat-value"><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format($total_brand_sales, 2)); ?></p>
         <p class="stat-description">From your brand's successful sales.</p>
     </div>
     <div class="stat-card total-orders">
@@ -152,7 +152,7 @@ try {
     </div>
     <div class="stat-card average-order">
         <h3>Avg. Order Value (Your Products)</h3>
-        <p class="stat-value"><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format($average_brand_order_value, 2)); ?></p>
+        <p class="stat-value"><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format($average_brand_order_value, 2)); ?></p>
         <p class="stat-description">Per order with your products.</p>
     </div>
     <div class="stat-card total-products">
@@ -198,7 +198,7 @@ try {
                             <td><a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>">#<?php echo htmlspecialchars($order['order_id']); ?></a></td>
                             <td><?php echo htmlspecialchars($order['customer_username'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars(date("M j, Y, g:i a", strtotime($order['order_date']))); ?></td>
-                            <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
+                            <td><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
                             <td><span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $order['order_status']))); ?>"><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $order['order_status']))); ?></span></td>
                             <td class="actions">
                                 <a href="order_detail.php?order_id=<?php echo htmlspecialchars($order['order_id']); ?>" class="btn-view">View</a>
@@ -265,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const chartMonths = <?php echo json_encode($chart_months ?? []); ?>;
     const brandSalesData = <?php echo json_encode($brand_sales_data ?? []); ?>;
     const brandOrdersData = <?php echo json_encode($brand_orders_data ?? []); ?>;
-    const currencySymbol = '<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? ''); ?>'; // FIX: htmlspecialchars on CURRENCY_SYMBOL in JS
+    const currencySymbol = '<?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? ''); ?>'; // FIX: htmlspecialchars on CURRENCY_SYMBOL in JS
 
     const defaultChartOptions = {
         responsive: true,

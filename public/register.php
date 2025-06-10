@@ -20,11 +20,14 @@ if (file_exists($config_path_from_public)) {
     }
 }
 
-// Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
-$header_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/header.php' : __DIR__ . '/../src/includes/header.php';
-$footer_path = defined('PROJECT_ROOT_PATH') ? PROJECT_ROOT_PATH . '/src/includes/footer.php' : __DIR__ . '/../src/includes/footer.php';
+// Define header and footer paths using PROJECT_ROOT_PATH.
+// PROJECT_ROOT_PATH is now reliably defined by config.php.
+$header_path = PROJECT_ROOT_PATH . '/src/includes/header.php';
+$footer_path = PROJECT_ROOT_PATH . '/src/includes/footer.php';
+
 
 // The header.php include will handle session_start()
+// REMOVED: Debug echo "Attempting to load header at..."
 if (file_exists($header_path)) {
     require_once $header_path;
 } else {
@@ -33,15 +36,12 @@ if (file_exists($header_path)) {
 
 // Redirect if user is already logged in
 if (isset($_SESSION['user_id'])) {
-    // Determine redirect based on role, using get_asset_url for consistency
     $redirect_url_if_already_loggedin = get_asset_url("my_account.php");
-    // The specific admin/brand_admin URLs should ideally be defined as constants in config.php
-    // For now, using direct paths via get_asset_url.
     if (isset($_SESSION['role'])) {
         if ($_SESSION['role'] === 'brand_admin') {
-            $redirect_url_if_already_loggedin = get_asset_url("brand_admin/index.php");
+            $redirect_url_if_already_loggedin = BRAND_ADMIN_ROOT_URL;
         } elseif ($_SESSION['role'] === 'super_admin') {
-            $redirect_url_if_already_loggedin = get_asset_url("admin/index.php");
+            $redirect_url_if_already_loggedin = ADMIN_ROOT_URL;
         }
     }
     header("Location: " . $redirect_url_if_already_loggedin);
@@ -58,12 +58,11 @@ if (!isset($db) || !$db instanceof PDO) {
     }
 }
 
-$errors = $errors ?? []; // Initialize if not already set (e.g. by DB check)
+$errors = $errors ?? [];
 $success_message = '';
 
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
-    // Sanitize and validate inputs
     $username = trim(filter_input(INPUT_POST, 'username', FILTER_UNSAFE_RAW));
     $email = trim(filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL));
     $phone_number = trim(filter_input(INPUT_POST, 'phone_number', FILTER_UNSAFE_RAW));
@@ -78,7 +77,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
     $shipping_governorate = trim(filter_input(INPUT_POST, 'shipping_governorate', FILTER_UNSAFE_RAW));
     $shipping_postal_code = trim(filter_input(INPUT_POST, 'shipping_postal_code', FILTER_UNSAFE_RAW));
 
-    // Basic Validations
     if (empty($username)) {
         $errors['username'] = "Username is required.";
     } elseif (strlen($username) < 3 || strlen($username) > 50) {
@@ -115,7 +113,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
     if (empty($shipping_city)) $errors['shipping_city'] = "City is required.";
     if (empty($shipping_governorate)) $errors['shipping_governorate'] = "Governorate is required.";
 
-    // If no validation errors and DB connection exists
     if (empty($errors) && isset($db) && $db instanceof PDO) {
         try {
             $stmt_check = $db->prepare("SELECT user_id FROM users WHERE username = :username OR email = :email OR phone_number = :phone_number LIMIT 1");
@@ -126,7 +123,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
             $existing_user = $stmt_check->fetch(PDO::FETCH_ASSOC);
 
             if ($existing_user) {
-                // More specific error messages
                 $stmt_check_username = $db->prepare("SELECT user_id FROM users WHERE username = :username LIMIT 1");
                 $stmt_check_username->execute([':username' => $username]);
                 if ($stmt_check_username->fetch()) $errors['username'] = "This username is already taken.";
@@ -139,7 +135,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
                 $stmt_check_phone->execute([':phone_number' => $phone_number]);
                 if ($stmt_check_phone->fetch()) $errors['phone_number'] = "This phone number is already registered.";
 
-                if(empty($errors)) $errors['form'] = "An account with the provided details already exists."; // Fallback if individual checks don't populate
+                if(empty($errors)) $errors['form'] = "An account with the provided details already exists.";
 
             } else {
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
@@ -153,8 +149,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
                         :shipping_address_line1, :shipping_address_line2, :shipping_city,
                         :shipping_governorate, :shipping_postal_code, 'customer', 1, NULL 
                     )
-                "); // Default role to customer, is_active to 1 (or 0 if email verification is strict)
-                   // email_verified_at to NULL initially
+                ");
 
                 $insert_stmt->execute([
                     ':username' => $username,
@@ -170,15 +165,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
                     ':shipping_postal_code' => $shipping_postal_code
                 ]);
                 
-                // $new_user_id = $db->lastInsertId();
-                // TODO: Implement email verification (send token, etc.)
-                // For now, redirect to login with a success message.
-                header("Location: " . get_asset_url("login.php?registration=success"));
+                $new_user_id = $db->lastInsertId();
+
+                $email_subject = SITE_NAME . " - Welcome to " . SITE_NAME . "!";
+                $email_body_html = "
+                <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;'>
+                    <h2 style='color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . ";'>Welcome to " . esc_html(SITE_NAME) . "!</h2>
+                    <p>Hello <strong>" . esc_html($first_name ?: $username) . "</strong>,</p>
+                    <p>Thank you for registering at " . esc_html(SITE_NAME) . "! We are thrilled to have you as part of our community.</p>
+                    <p>Your account has been successfully created. You can now log in and start exploring amazing local products.</p>
+                    <p style='margin-top: 20px;'>
+                        <a href='" . get_asset_url('login.php') . "' style='display: inline-block; padding: 10px 20px; background-color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . "; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;'>
+                            Log In to Your Account
+                        </a>
+                    </p>
+                    <p style='margin-top: 20px;'>If you have any questions, feel free to contact our support team.</p>
+                    <p>Welcome aboard!</p>
+                    <p>Regards,<br>The " . esc_html(SITE_NAME) . " Team</p>
+                </div>
+                ";
+                $email_body_plain = "Hello " . ($first_name ?: $username) . ",\n\n";
+                $email_body_plain .= "Thank you for registering at " . SITE_NAME . "! Your account has been successfully created.\n";
+                $email_body_plain .= "You can now log in here: " . get_asset_url('login.php') . "\n\n";
+                $email_body_plain .= "Regards,\nThe " . SITE_NAME . " Team";
+
+                $email_sent = send_email($email, $email_subject, $email_body_html, $email_body_plain, true);
+
+                if (!$email_sent) {
+                    error_log("Failed to send welcome email to '{$email}' upon registration.");
+                }
+
+                header("Location: " . get_asset_url("login.php?registered=success"));
                 exit;
             }
         } catch (PDOException $e) {
             error_log("Registration Error: " . $e->getMessage());
-            if ($e->getCode() == '23000') { // SQLSTATE for unique constraint violation
+            if ($e->getCode() == '23000') {
                  $errors['form'] = "An account with this username, email, or phone number already exists.";
             } else {
                 $errors['form'] = "An error occurred during registration. Please try again later.";
@@ -256,12 +278,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
             <div class="form-group">
                 <label for="shipping_city">City <span class="required">*</span></label>
                 <input type="text" id="shipping_city" name="shipping_city" value="<?php echo esc_html($_POST['shipping_city'] ?? ''); ?>" required aria-describedby="cityError">
-                <?php if (isset($errors['shipping_city'])): ?><span id="cityError" class="error-text"><?php echo esc_html($errors['shipping_city']); ?></span><?php endif; ?>
+                <?php if (isset($errors['shipping_city'])): ?><span id="cityError" class="error-text"><?php echo esc_html($errors['city']); ?></span><?php endif; ?>
             </div>
             <div class="form-group">
                 <label for="shipping_governorate">Governorate <span class="required">*</span></label>
                 <input type="text" id="shipping_governorate" name="shipping_governorate" value="<?php echo esc_html($_POST['shipping_governorate'] ?? ''); ?>" required aria-describedby="governorateError">
-                <?php if (isset($errors['shipping_governorate'])): ?><span id="governorateError" class="error-text"><?php echo esc_html($errors['shipping_governorate']); ?></span><?php endif; ?>
+                <?php if (isset($errors['governorate'])): ?><span id="governorateError" class="error-text"><?php echo esc_html($errors['governorate']); ?></span><?php endif; ?>
             </div>
             <div class="form-group">
                 <label for="shipping_postal_code">Postal Code (Optional)</label>
@@ -278,6 +300,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
 </section>
 
 <?php
+// REMOVED: Temporary email test block.
 // Include the footer
 if (file_exists($footer_path)) {
     require_once $footer_path;

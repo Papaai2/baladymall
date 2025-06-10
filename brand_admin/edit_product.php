@@ -333,13 +333,13 @@ $brand_admin_page_title = "Edit Product: " . htmlspecialchars($product['product_
         <legend>Pricing & Stock (for Simple Products)</legend>
         <small>If "Requires Variants" is checked, these might be overridden by variant-specific values.</small>
         <div class="form-group">
-            <label for="price">Price (<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? ''); ?>) <span class="price-stock-label-note"><?php echo $requires_variants_form ? '(Optional if variants define price)' : '<span style="color:red;">*</span>'; ?></span></label>
+            <label for="price">Price (<?php echo $GLOBALS['currency_symbol']; ?>) <span class="price-stock-label-note"><?php echo $requires_variants_form ? '(Optional if variants define price)' : '<span style="color:red;">*</span>'; ?></span></label>
             <input type="number" id="price" name="price" value="<?php echo htmlspecialchars($price_form ?? ''); ?>" step="0.01" min="0" placeholder="e.g., 199.99">
             <?php if (isset($errors['price'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['price']); ?></small><?php endif; ?>
         </div>
 
         <div class="form-group">
-            <label for="compare_at_price">Compare at Price (<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? ''); ?>)</label>
+            <label for="compare_at_price">Compare at Price (<?php echo $GLOBALS['currency_symbol']; ?>)</label>
             <input type="number" id="compare_at_price" name="compare_at_price" value="<?php echo htmlspecialchars($compare_at_price_form ?? ''); ?>" step="0.01" min="0" placeholder="Optional 'was' price">
             <?php if (isset($errors['compare_at_price'])): ?><small style="color:red;"><?php echo htmlspecialchars($errors['compare_at_price']); ?></small><?php endif; ?>
         </div>

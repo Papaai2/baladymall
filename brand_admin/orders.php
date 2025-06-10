@@ -150,7 +150,7 @@ if (isset($_SESSION['brand_admin_message'])) {
                         <?php echo htmlspecialchars(trim(($order['customer_full_name'] ?? '') ?: ($order['customer_username'] ?? 'N/A'))); ?> (ID: <?php echo htmlspecialchars($order['customer_user_id'] ?? 'N/A'); ?>)
                     </td>
                     <td><?php echo htmlspecialchars(date("M j, Y, g:i a", strtotime($order['order_date']))); ?></td>
-                    <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
+                    <td><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></td>
                     <td>
                         <span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $order['order_status']))); ?>">
                             <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $order['order_status']))); ?>

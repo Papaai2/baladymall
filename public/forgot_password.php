@@ -70,14 +70,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['send_reset_link'])) {
 
                 // 5. Send Email
                 $email_subject = SITE_NAME . " - Password Reset Request";
-                $email_body = "Hello " . htmlspecialchars($user['username']) . ",\n\n";
-                $email_body .= "You have requested to reset your password for your " . SITE_NAME . " account.\n\n";
-                $email_body .= "Please click on the following link to reset your password:\n";
-                $email_body .= $reset_link . "\n\n";
-                $email_body .= "This link is valid for 1 hour. If you did not request a password reset, please ignore this email.\n\n";
-                $email_body .= "Regards,\n" . SITE_NAME . " Team";
+                $email_body_html = "
+                <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;'>
+                    <h2 style='color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . ";'>Password Reset Request for " . esc_html(SITE_NAME) . "</h2>
+                    <p>Hello <strong>" . esc_html($user['username']) . "</strong>,</p>
+                    <p>You have requested to reset your password for your " . esc_html(SITE_NAME) . " account.</p>
+                    <p>Please click on the following link to reset your password:</p>
+                    <p style='margin-top: 20px;'>
+                        <a href='" . esc_html($reset_link) . "' style='display: inline-block; padding: 10px 20px; background-color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . "; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;'>
+                            Reset Your Password
+                        </a>
+                    </p>
+                    <p style='margin-top: 20px;'>This link is valid for 1 hour. If you did not request a password reset, please ignore this email.</p>
+                    <p>Regards,<br>The " . esc_html(SITE_NAME) . " Team</p>
+                </div>
+                ";
+                $email_body_plain = "Hello " . $user['username'] . ",\n\n";
+                $email_body_plain .= "You have requested to reset your password for your " . SITE_NAME . " account.\n\n";
+                $email_body_plain .= "Please click on the following link to reset your password:\n";
+                $email_body_plain .= $reset_link . "\n\n";
+                $email_body_plain .= "This link is valid for 1 hour. If you did not request a password reset, please ignore this email.\n\n";
+                $email_body_plain .= "Regards,\nThe " . SITE_NAME . " Team";
 
-                if (send_email($user['email'], $email_subject, $email_body)) {
+                $email_sent = send_email($user['email'], $email_subject, $email_body_html, $email_body_plain, true);
+
+                if ($email_sent) {
                     $message = "<div class='form-message success-message'>If an account with that email exists, a password reset link has been sent to your email address. Please check your inbox (and spam folder).</div>";
                     $email_form = ''; // Clear form on success
                 } else {
@@ -91,7 +108,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['send_reset_link'])) {
         } catch (PDOException $e) {
             error_log("Forgot Password Error: " . $e->getMessage());
             $message = "<div class='form-message error-message'>An error occurred. Please try again later.</div>";
-        } catch (Exception $e) {
+        } catch (Exception $e) { // Catch any other general exceptions
             error_log("Forgot Password Token Generation Error: " . $e->getMessage());
             $message = "<div class='form-message error-message'>An internal error occurred. Please try again.</div>";
         }

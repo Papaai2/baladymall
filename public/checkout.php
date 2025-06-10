@@ -21,28 +21,7 @@ if (file_exists($config_path_from_public)) {
     }
 }
 
-// --- PLACEHOLDER send_email function ---
-// IMPORTANT: Replace this with your actual email sending logic.
-// This function should ideally be in config.php or an included helper/functions file.
-if (!function_exists('send_email')) {
-    function send_email($to, $subject, $body, $headers = []) {
-        // For development, you might log emails instead of sending them
-        $log_message = "---- EMAIL ----\n";
-        $log_message .= "To: " . $to . "\n";
-        $log_message .= "Subject: " . $subject . "\n";
-        $log_message .= "Body:\n" . $body . "\n";
-        if (!empty($headers)) {
-            $log_message .= "Headers: " . print_r($headers, true) . "\n";
-        }
-        $log_message .= "---------------\n";
-        error_log($log_message); // Logs to your PHP error log
-
-        // To actually send, you would use mail() or a library like PHPMailer
-        // return mail($to, $subject, $body, implode("\r\n", $headers));
-        return true; // Placeholder success
-    }
-}
-// --- END PLACEHOLDER send_email function ---
+// Removed the placeholder send_email function, as it is now defined in config.php.
 
 
 // Define header and footer paths using PROJECT_ROOT_PATH for robustness if available.
@@ -341,16 +320,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                 unset($_SESSION['header_cart_item_count']);
                 $_SESSION['last_order_id'] = $new_order_id;
 
+                // --- NEW: Customer Order Confirmation Email (HTML) ---
                 $customer_email_subject = SITE_NAME . " - Order Confirmation #" . $new_order_id;
-                $customer_email_body = "Hello " . htmlspecialchars($user_first_name) . ",\n\n";
-                $customer_email_body .= "Thank you for your order! Your order #" . $new_order_id . " has been placed successfully.\n\n";
-                $customer_email_body .= "You can view your order details here: " . get_asset_url("order_detail.php?order_id=" . $new_order_id) . "\n\n";
-                $customer_email_body .= "Total Amount: " . CURRENCY_SYMBOL . number_format($grand_total_checkout, 2) . "\n\n";
-                $customer_email_body .= "We will notify you once your items are shipped.\n\n";
-                $customer_email_body .= "Regards,\n" . SITE_NAME . " Team";
-                send_email($user_email, $customer_email_subject, $customer_email_body);
+                $customer_email_body_html = "
+                <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;'>
+                    <h2 style='color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . ";'>Order Confirmed! Your Order #" . esc_html($new_order_id) . "</h2>
+                    <p>Hello <strong>" . esc_html($user_first_name) . "</strong>,</p>
+                    <p>Thank you for your order! Your order has been placed successfully and will be processed soon.</p>
+                    <p><strong>Order ID:</strong> #" . esc_html($new_order_id) . "</p>
+                    <p><strong>Total Amount:</strong> " . $GLOBALS['currency_symbol'] . esc_html(number_format($grand_total_checkout, 2)) . "</p>
+                    <p>You can view your order details here: <a href='" . get_asset_url("order_detail.php?order_id=" . $new_order_id) . "'>" . get_asset_url("order_detail.php?order_id=" . $new_order_id) . "</a></p>
+                    <p>We will notify you once your items are shipped.</p>
+                    <p>Regards,<br>The " . esc_html(SITE_NAME) . " Team</p>
+                </div>
+                ";
+                $customer_email_body_plain = "Hello " . $user_first_name . ",\n\n";
+                $customer_email_body_plain .= "Thank you for your order! Your order #" . $new_order_id . " has been placed successfully.\n\n";
+                $customer_email_body_plain .= "Order ID: #" . $new_order_id . "\n";
+                $customer_email_body_plain .= "Total Amount: " . $GLOBALS['currency_symbol'] . number_format($grand_total_checkout, 2) . "\n\n";
+                $customer_email_body_plain .= "View order details: " . get_asset_url("order_detail.php?order_id=" . $new_order_id) . "\n\n";
+                $customer_email_body_plain .= "Regards,\nThe " . SITE_NAME . " Team";
+
+                send_email($user_email, $customer_email_subject, $customer_email_body_html, $customer_email_body_plain, true);
 
 
+                // --- NEW: Brand Admin Notification Email (HTML) ---
                 foreach ($brand_admin_emails_for_notification as $brand_id_notif => $admin_email_notif) {
                     $brand_name_notif = '';
                     $stmt_brand_name = $db->prepare("SELECT brand_name FROM brands WHERE brand_id = :brand_id LIMIT 1");
@@ -361,12 +355,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                         $brand_name_notif = " for Brand " . htmlspecialchars($brand_name_result['brand_name']);
                     }
                     $brand_admin_subject = SITE_NAME . " - New Order Received (Order #{$new_order_id}){$brand_name_notif}";
-                    $brand_admin_body = "Hello Brand Admin,\n\n";
-                    $brand_admin_body .= "A new order (#{$new_order_id}) has been placed on " . SITE_NAME . " that includes products from your brand.\n\n";
-                    $brand_admin_body .= "Please log in to your Brand Admin Panel to view the order details and update item statuses:\n";
-                    $brand_admin_body .= get_asset_url("brand_admin/order_detail.php?order_id=" . $new_order_id) . "\n\n";
-                    $brand_admin_body .= "Regards,\n" . SITE_NAME . " Team";
-                    send_email($admin_email_notif, $brand_admin_subject, $brand_admin_body);
+                    $brand_admin_body_html = "
+                    <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;'>
+                        <h2 style='color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . ";'>New Order Notification from " . esc_html(SITE_NAME) . "</h2>
+                        <p>Hello Brand Admin,</p>
+                        <p>A new order (#<strong>" . esc_html($new_order_id) . "</strong>) has been placed on " . esc_html(SITE_NAME) . " that includes products from your brand{$brand_name_notif}.</p>
+                        <p style='margin-top: 20px;'>Please log in to your Brand Admin Panel to view the order details and update item statuses:</p>
+                        <p>
+                            <a href='" . BRAND_ADMIN_ROOT_URL . "' style='display: inline-block; padding: 10px 20px; background-color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . "; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;'>
+                                Go to Brand Dashboard
+                            </a>
+                        </p>
+                        <p style='margin-top: 20px;'>You can view specific order details here: <a href='" . get_asset_url("brand_admin/order_detail.php?order_id=" . $new_order_id) . "'>" . get_asset_url("brand_admin/order_detail.php?order_id=" . $new_order_id) . "</a></p>
+                        <p>Regards,<br>The " . esc_html(SITE_NAME) . " Team</p>
+                    </div>
+                    ";
+                    $brand_admin_body_plain = "Hello Brand Admin,\n\n";
+                    $brand_admin_body_plain .= "A new order (#{$new_order_id}) has been placed on " . SITE_NAME . " that includes products from your brand{$brand_name_notif}.\n\n";
+                    $brand_admin_body_plain .= "Please log in to your Brand Admin Panel to view the order details and update item statuses:\n";
+                    $brand_admin_body_plain .= BRAND_ADMIN_ROOT_URL . "\n";
+                    $brand_admin_body_plain .= "Specific order details: " . get_asset_url("brand_admin/order_detail.php?order_id=" . $new_order_id) . "\n\n";
+                    $brand_admin_body_plain .= "Regards,\nThe " . SITE_NAME . " Team";
+                    
+                    send_email($admin_email_notif, $brand_admin_subject, $brand_admin_body_html, $brand_admin_body_plain, true);
                 }
 
                 header("Location: " . get_asset_url("order_success.php"));
@@ -491,19 +502,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                         <?php foreach ($cart_items_details_checkout as $item_sum): ?>
                             <li>
                                 <span class="item-name"><?php echo esc_html($item_sum['name']); ?> (x<?php echo esc_html($item_sum['quantity']); ?>)</span>
-                                <span class="item-price"><?php echo CURRENCY_SYMBOL . esc_html(number_format($item_sum['line_total'], 2)); ?></span>
+                                <span class="item-price"><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($item_sum['line_total'], 2)); ?></span>
                             </li>
                         <?php endforeach; ?>
                         </ul>
                         <hr>
-                        <p><strong>Subtotal:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($cart_subtotal_checkout, 2)); ?></span></p>
+                        <p><strong>Subtotal:</strong> <span><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($cart_subtotal_checkout, 2)); ?></span></p>
                         <p>Shipping: <span class="text-muted"><?php echo ($shipping_amount_checkout > 0) ? CURRENCY_SYMBOL . esc_html(number_format($shipping_amount_checkout, 2)) : 'Free'; ?></span></p>
                         <p>Taxes: <span class="text-muted"><?php echo ($tax_amount_checkout > 0) ? CURRENCY_SYMBOL . esc_html(number_format($tax_amount_checkout, 2)) : '0.00'; ?></span></p>
                         <?php if ($discount_amount_checkout > 0): ?>
-                        <p><strong>Discount:</strong> <span style="color: green;">-<?php echo CURRENCY_SYMBOL . esc_html(number_format($discount_amount_checkout, 2)); ?></span></p>
+                        <p><strong>Discount:</strong> <span style="color: green;">-<?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($discount_amount_checkout, 2)); ?></span></p>
                         <?php endif; ?>
                         <hr>
-                        <p class="grand-total"><strong>Total:</strong> <strong><?php echo CURRENCY_SYMBOL . esc_html(number_format($grand_total_checkout, 2)); ?></strong></p>
+                        <p class="grand-total"><strong>Total:</strong> <strong><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($grand_total_checkout, 2)); ?></strong></p>
                     <?php elseif (empty($errors['database']) && empty($errors['cart_stock']) && empty($errors['cart_availability'])): // Only show "cart is empty" if no other critical errors ?>
                         <p>Your cart is empty or items are unavailable.</p>
                     <?php endif; ?>

@@ -1,16 +1,10 @@
 <?php
 // brand_admin/includes/header.php
 
-// Ensure main config is loaded for SITE_URL etc.
-// This block should ideally not be needed if the calling PHP file correctly
-// includes config.php BEFORE this header.php.
-// Given current project structure, config.php is always included first by main scripts.
-// Therefore, we can remove the redundant SITE_URL definition logic here.
-// Example: If it's not defined, it means config.php wasn't loaded, which is a critical error.
+// Ensure main config is loaded for SITE_URL, DB_NAME etc.
+// This should be done by the calling page (e.g., brand_admin/index.php) before including this header.
+// If not defined, it means a critical setup error in the calling script.
 if (!defined('SITE_URL')) {
-    // This indicates a missing include in the calling page.
-    // For production, you might want to log this and redirect or die.
-    // For development, we'll try to load it.
     $main_config_path_header = dirname(dirname(__DIR__)) . '/src/config/config.php';
     if (file_exists($main_config_path_header)) {
         require_once $main_config_path_header;
@@ -22,26 +16,12 @@ if (!defined('SITE_URL')) {
 // The auth_check.php (included by the calling page) should have already started the session
 // and set $_SESSION['brand_id'] and $_SESSION['brand_name'].
 
-// $brand_admin_base_for_assets is for relative paths to CSS/JS from the current PHP file's location.
-$brand_admin_base_for_assets = $brand_admin_base_url ?? '.'; // Default to current dir if not set by calling page
+// Remove $brand_admin_base_for_assets as we will primarily use get_asset_url which relies on SITE_URL from config.php
+// $brand_admin_base_for_assets = $brand_admin_base_url ?? '.'; // Default to current dir if not set by calling page
 
-// Define BRAND_ADMIN_BASE_URL_FOR_LINKS for constructing absolute URLs for navigation links
-if (!defined('BRAND_ADMIN_BASE_URL_FOR_LINKS')) {
-    // FIX: More robust calculation based on SITE_URL and PROJECT_ROOT_PATH structure
-    // SITE_URL is e.g., http://localhost/baladymall/public
-    // PROJECT_ROOT_PATH is /path/to/baladymall
-    // BRAND_ADMIN_BASE_URL_FOR_LINKS should be http://localhost/baladymall/brand_admin
-    $current_site_url_from_config = rtrim(SITE_URL, '/');
+// BRAND_ADMIN_ROOT_URL is now defined in config.php as absolute URL. Use that directly.
 
-    // Determine the base URL for the project itself (e.g., http://localhost/baladymall)
-    // This assumes /public is always at the end of SITE_URL and one level below project root.
-    $project_base_url_auto_derived = substr($current_site_url_from_config, 0, strrpos($current_site_url_from_config, '/public'));
-    
-    // Now construct the brand_admin URL using the project base URL
-    define('BRAND_ADMIN_BASE_URL_FOR_LINKS', rtrim($project_base_url_auto_derived, '/') . '/brand_admin');
-}
-
-// Determine the display name for the brand admin
+// Determine the display name for the admin
 $brand_admin_display_name = 'Brand Admin';
 if (isset($_SESSION['first_name']) && !empty(trim($_SESSION['first_name']))) {
     $brand_admin_display_name = htmlspecialchars($_SESSION['first_name']);
@@ -49,13 +29,11 @@ if (isset($_SESSION['first_name']) && !empty(trim($_SESSION['first_name']))) {
     $brand_admin_display_name = htmlspecialchars($_SESSION['username']);
 }
 
-$assigned_brand_name = $_SESSION['brand_name'] ?? 'Your Brand'; // FIX: Coalesce for htmlspecialchars
-
 // Determine active page for navigation styling
 $current_page_script = basename($_SERVER['PHP_SELF']);
-$product_pages = ['products.php', 'add_product.php', 'edit_product.php', 'batch_upload_products.php']; // FIX: Added batch_upload
-$order_pages = ['orders.php', 'order_detail.php'];
-$settings_pages = ['settings.php'];
+$product_pages = ['products.php', 'add_product.php', 'edit_product.php', 'batch_upload_products.php']; // Include batch upload
+$order_pages = ['orders.php', 'order_detail.php']; // Assuming a future order detail page
+$settings_page = 'settings.php';
 
 ?>
 <!DOCTYPE html>
@@ -63,29 +41,30 @@ $settings_pages = ['settings.php'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo isset($brand_admin_page_title) ? htmlspecialchars($brand_admin_page_title) : 'Brand Admin Panel'; ?> - <?php echo htmlspecialchars($assigned_brand_name); ?></title>
+    <title><?php echo isset($brand_admin_page_title) ? htmlspecialchars($brand_admin_page_title) : 'Brand Admin Panel'; ?> - <?php echo defined('SITE_NAME') ? htmlspecialchars(SITE_NAME) : 'BaladyMall'; ?></title>
     <?php
-    // FIX: Use filemtime for cache busting for CSS
-    $brand_admin_css_full_path = PROJECT_ROOT_PATH . '/brand_admin' . '/css/brand_admin_style.css'; // Adjust path if CSS is elsewhere
-    $css_cache_buster = file_exists($brand_admin_css_full_path) ? filemtime($brand_admin_css_full_path) : time();
+    // FIX: Use get_asset_url for cache busting for CSS from PUBLIC_ROOT_PATH structure
+    // This assumes brand_admin_style.css is at public/brand_admin/css/brand_admin_style.css
+    $brand_admin_css_full_path_for_mtime = PROJECT_ROOT_PATH . '/brand_admin/css/brand_admin_style.css';
+    $css_cache_buster = file_exists($brand_admin_css_full_path_for_mtime) ? filemtime($brand_admin_css_full_path_for_mtime) : time();
     ?>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars($brand_admin_base_for_assets); ?>/css/brand_admin_style.css?v=<?php echo $css_cache_buster; ?>">
+    <link rel="stylesheet" href="<?php echo get_asset_url('brand_admin/css/brand_admin_style.css?v=' . $css_cache_buster); ?>">
     <?php
-    // FIX: Robust image path determination for favicon
+    // FIX: Robust image path determination for favicon using PUBLIC_UPLOADS_URL_BASE
     $favicon_display_url = '';
     if (defined('FAVICON_PATH') && !empty(FAVICON_PATH)) {
         if (filter_var(FAVICON_PATH, FILTER_VALIDATE_URL) || strpos(FAVICON_PATH, '//') === 0) {
             $favicon_display_url = htmlspecialchars(FAVICON_PATH);
         } else {
-            // Only check file_exists if it's a local path
-            if (file_exists(PUBLIC_UPLOADS_PATH . FAVICON_PATH)) {
+            $full_favicon_path = PUBLIC_UPLOADS_PATH . FAVICON_PATH;
+            if (file_exists($full_favicon_path) && is_file($full_favicon_path)) {
                 $favicon_display_url = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . FAVICON_PATH);
             }
         }
     }
     if ($favicon_display_url): ?>
-        <link rel="icon" href="<?php echo $favicon_display_url; ?>" type="image/x-icon">
-        <link rel="shortcut icon" href="<?php echo $favicon_display_url; ?>" type="image/x-icon">
+        <link rel="icon" href="<?php echo $favicon_display_url; ?>?v=<?php echo $css_cache_buster; ?>" type="image/x-icon">
+        <link rel="shortcut icon" href="<?php echo $favicon_display_url; ?>?v=<?php echo $css_cache_buster; ?>" type="image/x-icon">
     <?php endif; ?>
 </head>
 <body>
@@ -93,33 +72,33 @@ $settings_pages = ['settings.php'];
         <header class="brand-admin-header">
             <div class="brand-admin-header-inner">
                 <div class="brand-admin-logo">
-                    <a href="<?php echo rtrim(BRAND_ADMIN_BASE_URL_FOR_LINKS, '/'); ?>/index.php">
+                    <a href="<?php echo BRAND_ADMIN_ROOT_URL; ?>/index.php">
                         <?php
-                        // FIX: Robust image path determination for site logo
+                        // FIX: Robust image path determination for site logo using PUBLIC_UPLOADS_URL_BASE
                         $site_logo_display_url = '';
                         if (defined('SITE_LOGO_PATH') && !empty(SITE_LOGO_PATH)) {
                             if (filter_var(SITE_LOGO_PATH, FILTER_VALIDATE_URL) || strpos(SITE_LOGO_PATH, '//') === 0) {
                                 $site_logo_display_url = htmlspecialchars(SITE_LOGO_PATH);
                             } else {
-                                // Only check file_exists if it's a local path
-                                if (file_exists(PUBLIC_UPLOADS_PATH . SITE_LOGO_PATH)) {
+                                $full_site_logo_path = PUBLIC_UPLOADS_PATH . SITE_LOGO_PATH;
+                                if (file_exists($full_site_logo_path) && is_file($full_site_logo_path)) {
                                     $site_logo_display_url = htmlspecialchars(PUBLIC_UPLOADS_URL_BASE . SITE_LOGO_PATH);
                                 }
                             }
                         }
                         if ($site_logo_display_url): ?>
-                            <img src="<?php echo $site_logo_display_url; ?>?v=<?php echo time();?>" alt="<?php echo defined('SITE_NAME') ? htmlspecialchars(SITE_NAME) : 'BaladyMall'; ?> Logo" style="max-height: 40px; vertical-align: middle; margin-right: 10px;">
+                            <img src="<?php echo $site_logo_display_url; ?>?v=<?php echo $css_cache_buster;?>" alt="<?php echo defined('SITE_NAME') ? htmlspecialchars(SITE_NAME) : 'BaladyMall'; ?> Logo" style="max-height: 40px; vertical-align: middle; margin-right: 10px;">
                         <?php endif; ?>
-                        <?php echo defined('SITE_NAME') ? htmlspecialchars(SITE_NAME) : 'BaladyMall'; ?> - Brand Admin (<?php echo htmlspecialchars($assigned_brand_name); ?>)
+                        <?php echo defined('SITE_NAME') ? htmlspecialchars(SITE_NAME) : 'BaladyMall'; ?> - Brand Admin
                     </a>
                 </div>
                 <nav class="brand-admin-main-nav">
                     <ul>
                         <li>Welcome, <?php echo $brand_admin_display_name; ?>!</li>
-                        <li><a href="<?php echo rtrim(BRAND_ADMIN_BASE_URL_FOR_LINKS, '/'); ?>/index.php" class="<?php echo ($current_page_script === 'index.php') ? 'active' : ''; ?>">Dashboard</a></li>
-                        <li><a href="<?php echo rtrim(BRAND_ADMIN_BASE_URL_FOR_LINKS, '/'); ?>/products.php" class="<?php echo (in_array($current_page_script, $product_pages)) ? 'active' : ''; ?>">Products</a></li>
-                        <li><a href="<?php echo rtrim(BRAND_ADMIN_BASE_URL_FOR_LINKS, '/'); ?>/orders.php" class="<?php echo (in_array($current_page_script, $order_pages)) ? 'active' : ''; ?>">Orders</a></li>
-                        <li><a href="<?php echo rtrim(BRAND_ADMIN_BASE_URL_FOR_LINKS, '/'); ?>/settings.php" class="<?php echo (in_array($current_page_script, $settings_pages)) ? 'active' : ''; ?>">Brand Settings</a></li>
+                        <li><a href="<?php echo BRAND_ADMIN_ROOT_URL; ?>/index.php" class="<?php echo ($current_page_script === 'index.php') ? 'active' : ''; ?>">Dashboard</a></li>
+                        <li><a href="<?php echo BRAND_ADMIN_ROOT_URL; ?>/products.php" class="<?php echo (in_array($current_page_script, $product_pages)) ? 'active' : ''; ?>">Products</a></li>
+                        <li><a href="<?php echo BRAND_ADMIN_ROOT_URL; ?>/orders.php" class="<?php echo (in_array($current_page_script, $order_pages)) ? 'active' : ''; ?>">Orders</a></li>
+                        <li><a href="<?php echo BRAND_ADMIN_ROOT_URL; ?>/settings.php" class="<?php echo ($current_page_script === $settings_page) ? 'active' : ''; ?>">Settings</a></li>
                         <li><a href="<?php echo rtrim(SITE_URL, '/') . '/logout.php?brand_admin_logout=true'; ?>" class="logout-link">Logout</a></li>
                     </ul>
                 </nav>
@@ -127,3 +106,7 @@ $settings_pages = ['settings.php'];
         </header>
         <main class="brand-admin-main">
             <div class="brand-admin-container">
+                <?php
+                // Include the common message display logic
+                include_once PROJECT_ROOT_PATH . '/src/includes/display_admin_messages.php';
+                ?>

@@ -103,14 +103,25 @@ if ($token_valid && $_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset_
 
             $db->commit();
 
-            // Send password reset success email
+            // --- NEW: Send password reset success email ---
             $email_subject = SITE_NAME . " - Your Password Has Been Reset";
-            $email_body = "Hello " . esc_html($user_username_from_token) . ",\n\n";
-            $email_body .= "Your password for your " . SITE_NAME . " account has been successfully reset.\n\n";
-            $email_body .= "If you did not perform this action, please contact support immediately.\n\n";
-            $email_body .= "Regards,\n" . SITE_NAME . " Team";
+            $email_body_html = "
+            <div style='font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;'>
+                <h2 style='color: " . (defined('SITE_NAME') ? '#FF6B00' : '#007bff') . ";'>Password Successfully Reset for " . esc_html(SITE_NAME) . "</h2>
+                <p>Hello <strong>" . esc_html($user_username_from_token) . "</strong>,</p>
+                <p>Your password for your " . esc_html(SITE_NAME) . " account has been successfully reset.</p>
+                <p>You can now log in with your new password using this link: <a href='" . get_asset_url('login.php') . "'>" . get_asset_url('login.php') . "</a></p>
+                <p style='margin-top: 20px;'>If you did not perform this action, please contact support immediately.</p>
+                <p>Regards,<br>The " . esc_html(SITE_NAME) . " Team</p>
+            </div>
+            ";
+            $email_body_plain = "Hello " . $user_username_from_token . ",\n\n";
+            $email_body_plain .= "Your password for your " . SITE_NAME . " account has been successfully reset.\n\n";
+            $email_body_plain .= "You can now log in with your new password here: " . get_asset_url('login.php') . "\n\n";
+            $email_body_plain .= "If you did not perform this action, please contact support immediately.\n\n";
+            $email_body_plain .= "Regards,\nThe " . SITE_NAME . " Team";
 
-            if (send_email($user_email_from_token, $email_subject, $email_body)) {
+            if (send_email($user_email_from_token, $email_subject, $email_body_html, $email_body_plain, true)) { // true for HTML email
                 $_SESSION['password_reset_success'] = true; // Use session to show success message on login page
                 header("Location: " . get_asset_url("login.php?password_reset=success"));
                 exit;
@@ -146,8 +157,8 @@ if ($token_valid && $_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset_
     <?php if ($token_valid): ?>
         <p>Enter your new password for <?php echo esc_html($user_email_from_token); ?>.</p>
         <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]) . "?token=" . urlencode($token_param) . "&email=" . urlencode($email_param); ?>" method="POST" class="auth-form" novalidate>
-            <fieldset>
-                <legend>New Password</legend>
+            
+                
                 <div class="form-group">
                     <label for="new_password">New Password <span class="required">*</span> (Min. 6 characters)</label>
                     <input type="password" id="new_password" name="new_password" required aria-describedby="newPasswordError">
@@ -158,7 +169,7 @@ if ($token_valid && $_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['reset_
                     <input type="password" id="confirm_new_password" name="confirm_new_password" required aria-describedby="confirmNewPasswordError">
                     <?php if (isset($errors['confirm_new_password'])): ?><span id="confirmNewPasswordError" class="error-text"><?php echo esc_html($errors['confirm_new_password']); ?></span><?php endif; ?>
                 </div>
-            </fieldset>
+            
 
             <div class="form-group">
                 <button type="submit" name="reset_password_submit" class="btn btn-primary btn-block btn-lg">Reset Password</button>

@@ -10,8 +10,11 @@ if (file_exists($main_config_path)) {
 }
 require_once 'auth_check.php'; // Ensures user is brand_admin and sets $_SESSION['brand_id']
 
+
+
 $brand_admin_page_title = "Manage My Products";
 include_once 'includes/header.php';
+
 
 $db = getPDOConnection();
 
@@ -20,7 +23,11 @@ $current_brand_id = $_SESSION['brand_id'];
 $current_brand_name = $_SESSION['brand_name'];
 
 // --- Filtering ---
-$filter_status = filter_input(INPUT_GET, 'filter_status', FILTER_UNSAFE_RAW); // 'active', 'inactive', or '' for all
+$filter_status = filter_input(INPUT_GET, 'filter_status', FILTER_UNSAFE_RAW);
+if ($filter_status === null || $filter_status === '') {
+    $filter_status = 'active'; // Default to show active products
+}
+ // 'active', 'inactive', or '' for all
 
 // --- Pagination ---
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -34,9 +41,9 @@ $offset = ($page - 1) * $records_per_page;
 $sql_products = "SELECT p.product_id, p.product_name, p.price, p.stock_quantity, p.is_active, p.main_image_url,
                         b.brand_name, b.brand_id
                  FROM products p
-                 JOIN brands b ON p.brand_id = b.brand_id
+                 LEFT JOIN brands b ON p.brand_id = b.brand_id
                  WHERE p.brand_id = :brand_id"; // Crucial filter
-$sql_count = "SELECT COUNT(p.product_id) FROM products p JOIN brands b ON p.brand_id = b.brand_id WHERE p.brand_id = :brand_id"; // Crucial filter
+$sql_count = "SELECT COUNT(p.product_id) FROM products p LEFT JOIN brands b ON p.brand_id = b.brand_id WHERE p.brand_id = :brand_id"; // Crucial filter
 
 $params = [':brand_id' => $current_brand_id];
 $where_clauses = []; // Additional filters beyond brand_id
@@ -337,7 +344,7 @@ if (isset($_SESSION['brand_admin_message'])) {
                         </td>
                         <td><?php echo htmlspecialchars($product['product_id']); ?></td>
                         <td><?php echo htmlspecialchars($product['product_name'] ?? ''); ?></td>
-                        <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$product['price'], 2)); ?></td>
+                        <td><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$product['price'], 2)); ?></td>
                         <td><?php echo htmlspecialchars($product['stock_quantity'] ?? '0'); ?></td>
                         <td>
                             <span class="status-<?php echo $product['is_active'] ? 'active' : 'inactive'; ?>">

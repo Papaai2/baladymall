@@ -44,6 +44,91 @@ if (empty($page_error_message)) { // Proceed only if product ID seems valid init
     }
 }
 
+// Variables for reviews
+$reviews_list = [];
+$average_rating = 0;
+$total_reviews_count = 0;
+$review_form_message = '';
+$review_errors = [];
+$user_has_reviewed = false;          // Flag to check if the current user has already submitted a review
+$user_has_purchased_product = false; // New flag: Check if user has purchased this product
+
+// --- Handle Review Submission (if POST request and user is logged in) ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_review']) && isset($_SESSION['user_id'])) {
+    if ($product_id > 0 && isset($db) && $db instanceof PDO) {
+        $user_id_review = (int)$_SESSION['user_id']; // Explicitly cast to int for safety
+        $product_id_review = $product_id; // Use the ID from GET parameter
+
+        $rating = filter_input(INPUT_POST, 'rating', FILTER_VALIDATE_INT);
+        $review_text = trim(filter_input(INPUT_POST, 'review_text', FILTER_UNSAFE_RAW)); // Keep HTML for now, consider sanitizing later
+
+        // Input Validation
+        if ($rating === false || $rating < 1 || $rating > 5) {
+            $review_errors['rating'] = "Please provide a rating between 1 and 5 stars.";
+        }
+        if (empty($review_text)) {
+            $review_errors['review_text'] = "Review text cannot be empty.";
+        } elseif (strlen($review_text) > 1000) { // Limit review text length
+            $review_errors['review_text'] = "Review text is too long (max 1000 characters).";
+        }
+
+        if (empty($review_errors)) {
+            try {
+                // Check if user has already reviewed this product
+                $stmt_check_review = $db->prepare("SELECT review_id FROM product_reviews WHERE product_id = :product_id AND user_id = :user_id LIMIT 1");
+                $stmt_check_review->bindParam(':product_id', $product_id_review, PDO::PARAM_INT);
+                $stmt_check_review->bindParam(':user_id', $user_id_review, PDO::PARAM_INT);
+                $stmt_check_review->execute();
+                $existing_review = $stmt_check_review->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing_review) {
+                    $review_errors['form'] = "You have already submitted a review for this product.";
+                } else {
+                    // Check if user has purchased the product
+                    $stmt_check_purchase_for_review = $db->prepare("
+                        SELECT COUNT(oi.order_item_id)
+                        FROM order_items oi
+                        JOIN orders o ON oi.order_id = o.order_id
+                        WHERE oi.product_id = :product_id
+                          AND o.customer_id = :user_id
+                          AND o.order_status IN ('shipped', 'delivered') -- Only allow review if product was shipped/delivered
+                    ");
+                    $stmt_check_purchase_for_review->bindParam(':product_id', $product_id_review, PDO::PARAM_INT);
+                    $stmt_check_purchase_for_review->bindParam(':user_id', $user_id_review, PDO::PARAM_INT);
+                    $stmt_check_purchase_for_review->execute();
+                    $purchase_count = $stmt_check_purchase_for_review->fetchColumn();
+
+                    if ($purchase_count > 0) {
+                        // Insert the new review (initially as not approved: is_approved = 0)
+                        $stmt_insert_review = $db->prepare("
+                            INSERT INTO product_reviews (product_id, user_id, rating, review_text, is_approved)
+                            VALUES (:product_id, :user_id, :rating, :review_text, 1)
+                        ");
+                        $stmt_insert_review->bindParam(':product_id', $product_id_review, PDO::PARAM_INT);
+                        $stmt_insert_review->bindParam(':user_id', $user_id_review, PDO::PARAM_INT);
+                        $stmt_insert_review->bindParam(':rating', $rating, PDO::PARAM_INT);
+                        $stmt_insert_review->bindParam(':review_text', $review_text);
+                        $stmt_insert_review->execute();
+
+                        $review_form_message = "<div class='form-message success-message'>Thank you for your review! It will be visible after moderation.</div>";
+                        $_POST = []; // Clear form fields
+                        $user_has_reviewed = true; // Set flag to hide the form
+                    } else {
+                        $review_errors['form'] = "You must purchase this product (and it must be shipped/delivered) to leave a review.";
+                    }
+                }
+
+            } catch (PDOException $e) {
+                error_log("Error submitting review for product ID {$product_id_review}, User ID {$user_id_review}: " . $e->getMessage());
+                $review_errors['form'] = "An error occurred while submitting your review. Please try again.";
+            }
+        }
+    } else {
+        $review_errors['form'] = "Cannot submit review: Product or database connection error.";
+    }
+}
+
+
 if (empty($page_error_message) && $product_id > 0 && isset($db) && $db instanceof PDO) {
     try {
         // Fetch main product details
@@ -77,10 +162,68 @@ if (empty($page_error_message) && $product_id > 0 && isset($db) && $db instanceo
 
             // Set page title to product name
             $page_title = esc_html($product['product_name']) . " - BaladyMall";
+
+            // --- Fetch Approved Product Reviews and Calculate Average Rating ---
+            try {
+                // Fetch approved reviews, joining with users table to get username/name
+                $stmt_reviews = $db->prepare("
+                    SELECT pr.*, u.username, u.first_name, u.last_name
+                    FROM product_reviews pr
+                    JOIN users u ON pr.user_id = u.user_id
+                    WHERE pr.product_id = :product_id AND pr.is_approved = 1
+                    ORDER BY pr.created_at DESC
+                ");
+                $stmt_reviews->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+                $stmt_reviews->execute();
+                $reviews_list = $stmt_reviews->fetchAll(PDO::FETCH_ASSOC);
+                $total_reviews_count = count($reviews_list);
+
+                if ($total_reviews_count > 0) {
+                    $sum_ratings = array_sum(array_column($reviews_list, 'rating'));
+                    $average_rating = $sum_ratings / $total_reviews_count;
+                }
+
+                // Check if the current logged-in user has already reviewed this product AND purchased it
+                if (isset($_SESSION['user_id'])) {
+                    $current_logged_in_user_id = (int)$_SESSION['user_id']; // Cast to int immediately for safety
+
+                    $stmt_user_review_check = $db->prepare("SELECT review_id FROM product_reviews WHERE product_id = :product_id AND user_id = :user_id LIMIT 1");
+                    $stmt_user_review_check->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+                    $stmt_user_review_check->bindParam(':user_id', $current_logged_in_user_id, PDO::PARAM_INT);
+                    $stmt_user_review_check->execute();
+                    if ($stmt_user_review_check->fetch()) {
+                        $user_has_reviewed = true;
+                    }
+
+                    // Check if the current logged-in user has purchased this product
+                    $stmt_check_purchase = $db->prepare("
+                        SELECT COUNT(oi.order_item_id)
+                        FROM order_items oi
+                        JOIN orders o ON oi.order_id = o.order_id
+                        WHERE oi.product_id = :product_id
+                          AND o.customer_id = :user_id
+                          AND o.order_status IN ('shipped', 'delivered')
+                    ");
+                    $stmt_check_purchase->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+                    $stmt_check_purchase->bindParam(':user_id', $current_logged_in_user_id, PDO::PARAM_INT);
+                    $stmt_check_purchase->execute();
+                    $purchase_count = $stmt_check_purchase->fetchColumn();
+
+                    if ($purchase_count > 0) {
+                        $user_has_purchased_product = true;
+                    }
+                }
+
+            } catch (PDOException $e) {
+                // Log errors related to reviews or purchase status, but don't halt the page
+                error_log("Error fetching product reviews or purchase status for product ID {$product_id}: " . $e->getMessage());
+                // You might choose to display a soft message to the user here if reviews are critical:
+                // $page_level_error_reviews = "Could not load reviews or check purchase status at this time.";
+            }
         }
 
     } catch (PDOException $e) {
-        error_log("Error fetching product details (ID: $product_id): " . $e->getMessage());
+        error_log("Error fetching main product details (ID: $product_id): " . $e->getMessage());
         $page_error_message = "Sorry, we couldn't load the product details at this time. Please try again later.";
     }
 } elseif ($product_id === 0 && empty($page_error_message)) { // If ID was invalid from the start
@@ -135,7 +278,7 @@ if (file_exists($header_path)) {
                                     $main_image_src = esc_html($main_display_image_path);
                                 } else {
                                     // Assuming $main_display_image_path starts with 'products/'. Prepends 'uploads/'
-                                    $main_image_src = get_asset_url('uploads/' . ltrim(esc_html($main_display_image_path), '/'));
+                                    $main_image_src = get_asset_url('uploads/' . ltrim($main_display_image_path, '/')); // Use ltrim to ensure no double slash if path starts with one
                                 }
                             }
 
@@ -174,7 +317,7 @@ if (file_exists($header_path)) {
                                         if (filter_var($thumb_path, FILTER_VALIDATE_URL)) {
                                             $thumb_src = $thumb_path;
                                         } else {
-                                            $thumb_src = get_asset_url('uploads/products/' . ltrim($thumb_path, '/'));
+                                            $thumb_src = get_asset_url('uploads/' . ltrim($thumb_path, '/'));
                                         }
                                     } else {
                                         continue; // Skip if no valid image path for thumbnail
@@ -195,11 +338,29 @@ if (file_exists($header_path)) {
                     <p class="product-brand-info">
                         By: <a href="<?php echo get_asset_url('products.php?brand_id=' . esc_html($product['brand_id'])); ?>"><?php echo esc_html($product['brand_name']); ?></a>
                     </p>
+                    
+                    <?php if ($total_reviews_count > 0): ?>
+                        <div class="product-detail-rating">
+                            <span class="stars">
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                    <?php if ($i <= round($average_rating)): ?>
+                                        <i class="fa-solid fa-star" style="color: gold;"></i>
+                                    <?php else: ?>
+                                        <i class="fa-regular fa-star" style="color: lightgray;"></i>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+                            </span>
+                            <span class="review-count">(<?php echo esc_html($total_reviews_count); ?> Reviews)</span>
+                            <a href="#customer-reviews" class="view-all-reviews-link">View all reviews</a>
+                        </div>
+                    <?php else: ?>
+                        <p class="no-reviews-text">No reviews yet. Be the first!</p>
+                    <?php endif; ?>
 
                     <div class="price-section">
-                        <span class="current-price"><?php echo CURRENCY_SYMBOL . esc_html(number_format($product['price'], 2)); ?></span>
+                        <span class="current-price"><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($product['price'], 2)); ?></span>
                         <?php if (isset($product['compare_at_price']) && $product['compare_at_price'] > 0 && $product['compare_at_price'] > $product['price']): ?>
-                            <span class="original-price"><?php echo CURRENCY_SYMBOL . esc_html(number_format($product['compare_at_price'], 2)); ?></span>
+                            <span class="original-price"><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($product['compare_at_price'], 2)); ?></span>
                             <?php
                                 $discount_percentage = (($product['compare_at_price'] - $product['price']) / $product['compare_at_price']) * 100;
                             ?>
@@ -258,6 +419,100 @@ if (file_exists($header_path)) {
                 </div>
             </div>
 
+            <section class="product-reviews-section" id="customer-reviews">
+                <div class="reviews-summary">
+                    <h2>Customer Reviews (<?php echo $total_reviews_count; ?>)</h2>
+                    <?php if ($total_reviews_count > 0): ?>
+                        <div class="average-rating">
+                            Average Rating: **<?php echo number_format($average_rating, 1); ?>** out of 5
+                            <span class="stars">
+                                <?php for ($i = 1; $i <= 5; $i++): ?>
+                                    <?php if ($i <= round($average_rating)): ?>
+                                        <i class="fa-solid fa-star" style="color: gold;"></i>
+                                    <?php else: ?>
+                                        <i class="fa-regular fa-star" style="color: lightgray;"></i>
+                                    <?php endif; ?>
+                                <?php endfor; ?>
+                            </span>
+                        </div>
+                    <?php else: ?>
+                        <p>No reviews yet. Be the first to review this product!</p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="review-list">
+                    <h3>All Reviews</h3>
+                    <?php if (!empty($reviews_list)): ?>
+                        <?php foreach ($reviews_list as $review): ?>
+                            <div class="review-item">
+                                <p class="review-author">
+                                    <strong><?php echo esc_html($review['first_name'] ?: $review['username']); ?></strong>
+                                    on <?php echo esc_html(date("F j, Y", strtotime($review['created_at']))); ?>
+                                </p>
+                                <div class="review-rating">
+                                    <?php for ($i = 1; $i <= 5; $i++): ?>
+                                        <?php if ($i <= $review['rating']): ?>
+                                            <i class="fa-solid fa-star" style="color: gold;"></i>
+                                        <?php else: ?>
+                                            <i class="fa-regular fa-star" style="color: lightgray;"></i>
+                                        <?php endif; ?>
+                                    <?php endfor; ?>
+                                </div>
+                                <p class="review-text"><?php echo nl2br(esc_html($review['review_text'])); ?></p>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <p class="info-message text-center">No reviews to display at the moment.</p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="review-submission-form">
+                    <?php if (isset($_SESSION['user_id'])): // User is logged in ?>
+                        <?php if ($user_has_purchased_product): // User has purchased the product ?>
+                            <?php if (!$user_has_reviewed): // User has not yet reviewed this specific product ?>
+                                <h3>Submit Your Review</h3>
+                                <?php if (!empty($review_form_message)): ?>
+                                    <?php echo $review_form_message; // Success message from PHP ?>
+                                <?php endif; ?>
+                                <?php if (!empty($review_errors['form'])): ?>
+                                    <div class="form-message error-message">
+                                        <?php echo esc_html($review_errors['form']); ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]) . '?id=' . esc_html($product_id); ?>" method="POST" class="auth-form" novalidate>
+                                    <div class="form-group">
+                                        <label for="rating">Your Rating <span class="required">*</span></label>
+                                        <select id="rating" name="rating" required class="form-control">
+                                            <option value="">Select a rating</option>
+                                            <option value="5" <?php echo (isset($_POST['rating']) && $_POST['rating'] == 5) ? 'selected' : ''; ?>>5 Stars - Excellent</option>
+                                            <option value="4" <?php echo (isset($_POST['rating']) && $_POST['rating'] == 4) ? 'selected' : ''; ?>>4 Stars - Very Good</option>
+                                            <option value="3" <?php echo (isset($_POST['rating']) && $_POST['rating'] == 3) ? 'selected' : ''; ?>>3 Stars - Good</option>
+                                            <option value="2" <?php echo (isset($_POST['rating']) && $_POST['rating'] == 2) ? 'selected' : ''; ?>>2 Stars - Fair</option>
+                                            <option value="1" <?php echo (isset($_POST['rating']) && $_POST['rating'] == 1) ? 'selected' : ''; ?>>1 Star - Poor</option>
+                                        </select>
+                                        <?php if (isset($review_errors['rating'])): ?><span class="error-text"><?php echo esc_html($review_errors['rating']); ?></span><?php endif; ?>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="review_text">Your Review <span class="required">*</span></label>
+                                        <textarea id="review_text" name="review_text" rows="5" class="form-control" required><?php echo esc_html($_POST['review_text'] ?? ''); ?></textarea>
+                                        <?php if (isset($review_errors['review_text'])): ?><span class="error-text"><?php echo esc_html($review_errors['review_text']); ?></span><?php endif; ?>
+                                    </div>
+                                    <div class="form-group">
+                                        <button type="submit" name="submit_review" class="btn btn-primary">Submit Review</button>
+                                    </div>
+                                </form>
+                            <?php else: // User has reviewed ?>
+                                <p class="info-message text-center">You have already submitted a review for this product. Thank you!</p>
+                                <?php endif; ?>
+                        <?php else: // User is logged in but hasn't purchased the product ?>
+                            <p class="info-message text-center">You must purchase this product (and it must be shipped/delivered) to leave a review.</p>
+                        <?php endif; ?>
+                    <?php else: // User is not logged in ?>
+                        <p class="info-message text-center">Please <a href="<?php echo get_asset_url('login.php?redirect=' . urlencode($_SERVER['REQUEST_URI'])); ?>">log in</a> to submit a review.</p>
+                    <?php endif; ?>
+                </div>
+            </section>
             <?php
             // TODO: Related Products Section (fetch and display similar products)
             // <section class="related-products-section mt-5"><h2>You Might Also Like</h2><div class="product-grid">...</div></section>

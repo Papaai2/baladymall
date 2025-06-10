@@ -300,9 +300,9 @@ $csrf_token = $_SESSION['csrf_token'];
                             </td>
                             <td><?php echo htmlspecialchars($item['variant_sku'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars($item['variant_attributes'] ?? 'N/A'); ?></td>
-                            <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$item['price_at_purchase'], 2)); ?></td>
+                            <td><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$item['price_at_purchase'], 2)); ?></td>
                             <td><?php echo htmlspecialchars($item['quantity'] ?? 'N/A'); ?></td>
-                            <td><?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$item['subtotal_for_item'], 2)); ?></td>
+                            <td><?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$item['subtotal_for_item'], 2)); ?></td>
                             <td>
                                 <span class="status-<?php echo htmlspecialchars(strtolower(str_replace('_', '-', $item['item_status'] ?? ''))); ?>">
                                     <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $item['item_status'] ?? 'N/A'))); ?>
@@ -333,16 +333,16 @@ $csrf_token = $_SESSION['csrf_token'];
         </div>
         <div class="order-totals" style="flex: 1 1 300px; text-align: right; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
             <h3 style="margin-top:0; text-align:left;">Order Totals</h3>
-            <p><strong>Subtotal:</strong> <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['subtotal_amount'], 2)); ?></p>
-            <p><strong>Shipping:</strong> <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['shipping_amount'], 2)); ?></p>
+            <p><strong>Subtotal:</strong> <?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$order['subtotal_amount'], 2)); ?></p>
+            <p><strong>Shipping:</strong> <?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$order['shipping_amount'], 2)); ?></p>
             <?php if ((float)$order['discount_amount'] > 0): ?>
-                <p><strong>Discount:</strong> -<?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['discount_amount'], 2)); ?></p>
+                <p><strong>Discount:</strong> -<?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$order['discount_amount'], 2)); ?></p>
             <?php endif; ?>
             <?php if ((float)$order['tax_amount'] > 0): ?>
-                <p><strong>Tax:</strong> <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['tax_amount'], 2)); ?></p>
+                <p><strong>Tax:</strong> <?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$order['tax_amount'], 2)); ?></p>
             <?php endif; ?>
             <hr>
-            <p style="font-size: 1.2em; font-weight: bold;"><strong>Grand Total: <?php echo htmlspecialchars(CURRENCY_SYMBOL ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></strong></p>
+            <p style="font-size: 1.2em; font-weight: bold;"><strong>Grand Total: <?php echo htmlspecialchars($GLOBALS['currency_symbol'] ?? '') . htmlspecialchars(number_format((float)$order['total_amount'], 2)); ?></strong></p>
         </div>
     </div>
 

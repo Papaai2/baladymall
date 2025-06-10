@@ -142,20 +142,20 @@ if (empty($page_error_message) && $order_id > 0 && isset($db) && $db instanceof 
 
                     <div class="order-totals-block order-detail-card">
                         <h3>Order Summary</h3>
-                        <p><strong>Subtotal:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($order_details['subtotal_amount'], 2)); ?></span></p>
+                        <p><strong>Subtotal:</strong> <span><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($order_details['subtotal_amount'], 2)); ?></span></p>
                         <?php if ($order_details['shipping_amount'] > 0): ?>
-                            <p><strong>Shipping:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($order_details['shipping_amount'], 2)); ?></span></p>
+                            <p><strong>Shipping:</strong> <span><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($order_details['shipping_amount'], 2)); ?></span></p>
                         <?php else: ?>
                             <p><strong>Shipping:</strong> <span>Free</span></p>
                         <?php endif; ?>
                         <?php if ($order_details['tax_amount'] > 0): ?>
-                            <p><strong>Taxes:</strong> <span><?php echo CURRENCY_SYMBOL . esc_html(number_format($order_details['tax_amount'], 2)); ?></span></p>
+                            <p><strong>Taxes:</strong> <span><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($order_details['tax_amount'], 2)); ?></span></p>
                         <?php endif; ?>
                         <?php if ($order_details['discount_amount'] > 0): ?>
-                            <p><strong>Discount:</strong> <span style="color: green;">-<?php echo CURRENCY_SYMBOL . esc_html(number_format($order_details['discount_amount'], 2)); ?></span></p>
+                            <p><strong>Discount:</strong> <span style="color: green;">-<?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($order_details['discount_amount'], 2)); ?></span></p>
                         <?php endif; ?>
                         <hr>
-                        <p class="grand-total"><strong>Grand Total:</strong> <strong><?php echo CURRENCY_SYMBOL . esc_html(number_format($order_details['total_amount'], 2)); ?></strong></p>
+                        <p class="grand-total"><strong>Grand Total:</strong> <strong><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($order_details['total_amount'], 2)); ?></strong></p>
                     </div>
                 </div>
 
@@ -213,9 +213,9 @@ if (empty($page_error_message) && $order_id > 0 && isset($db) && $db instanceof 
                                             <a href="<?php echo $product_item_url; ?>"><?php echo esc_html($item['product_name']); ?></a>
                                         </td>
                                         <td data-label="Brand"><?php echo esc_html($item['brand_name']); ?></td>
-                                        <td class="text-right" data-label="Price"><?php echo CURRENCY_SYMBOL . esc_html(number_format($item['price_at_purchase'], 2)); ?></td>
+                                        <td class="text-right" data-label="Price"><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($item['price_at_purchase'], 2)); ?></td>
                                         <td class="text-center" data-label="Quantity"><?php echo esc_html($item['quantity']); ?></td>
-                                        <td class="text-right" data-label="Line Total"><?php echo CURRENCY_SYMBOL . esc_html(number_format($item['subtotal_for_item'], 2)); ?></td>
+                                        <td class="text-right" data-label="Line Total"><?php echo $GLOBALS['currency_symbol'] . esc_html(number_format($item['subtotal_for_item'], 2)); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>

@@ -30,7 +30,7 @@ if (file_exists($header_path)) {
 }
 
 // Variables for contact information (can be fetched from DB/config or hardcoded)
-$contact_email = defined('PUBLIC_CONTACT_EMAIL') ? PUBLIC_CONTACT_EMAIL : 'info@baladymall.com';
+$contact_email = defined('PUBLIC_CONTACT_EMAIL') ? PUBLIC_CONTACT_EMAIL : 'support@baladymall.com';
 $contact_phone = defined('PUBLIC_CONTACT_PHONE') ? PUBLIC_CONTACT_PHONE : '+20 123 456 7890';
 
 // Form handling logic removed as per request

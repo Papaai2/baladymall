@@ -1,20 +1,86 @@
-# baladymall/.htaccess
-
 # ----------------------------------------------------------------------
 # | Essential Basic Configuration                                      |
 # ----------------------------------------------------------------------
 
-# Prevent directory listing
 Options -Indexes
-
-# Set the default file to serve when a directory is requested (e.g., /public/)
 DirectoryIndex index.php index.html
 
 # ----------------------------------------------------------------------
-# | Security Enhancements (retained from previous versions)            |
+# | PHP Configuration (Moved here from config.php for server-level control) |
+# ----------------------------------------------------------------------
+# This is a server-level setting and overrides PHP's ini_set().
+# For production, display_errors should be Off. Errors will still be logged by config.php's error_log.
+php_value display_errors Off
+php_value date.timezone Africa/Cairo
+
+# ----------------------------------------------------------------------
+# | Force HTTPS + non-www Redirect                                     |
 # ----------------------------------------------------------------------
 
-# Deny access to sensitive files and directories
+RewriteEngine On
+
+# Redirect www to non-www (optional — flip if you want www)
+RewriteCond %{HTTP_HOST} ^www\.baladymall\.wuaze\.com$ [NC] # Updated domain to wuaze.com
+RewriteRule ^(.*)$ https://baladymall.wuaze.com/$1 [L,R=301] # Updated domain to wuaze.com
+
+# Redirect HTTP to HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ✅ Redirect root to /public (if .htaccess is in htdocs root)
+# If a request comes to the root (e.g., baladymall.wuaze.com/)
+# it will internally rewrite to baladymall.wuaze.com/public/
+RewriteCond %{REQUEST_URI} ^/?$
+RewriteRule ^$ public/ [L,R=301] # Use a 301 redirect for browsers to update their links
+
+# ----------------------------------------------------------------------
+# | Custom Error Pages                                                 |
+# ----------------------------------------------------------------------
+# Paths are relative to the Document Root (htdocs/).
+# So /public/error/404.php points to htdocs/public/error/404.php
+ErrorDocument 400 /public/error/400.php
+ErrorDocument 401 /public/error/401.php
+ErrorDocument 403 /public/error/403.php
+ErrorDocument 404 /public/error/404.php
+ErrorDocument 500 /public/error/500.php
+
+
+# ----------------------------------------------------------------------
+# | URL Rewriting (Hide .php Extension & Serve all public requests via public/index.php) |
+# ----------------------------------------------------------------------
+
+# This RewriteBase applies to the directory where this .htaccess is located (htdocs)
+RewriteBase /
+
+# Rewrite for requests that DO NOT point to existing files or directories
+# This is for internal routing to the public/index.php (front controller)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ public/index.php [L]
+
+# Additional rule to hide .php extension for direct access to public PHP files
+# This rule should ideally be placed in public/.htaccess if public/ is your actual web root.
+# If htdocs/ is the root and you have public/ as a subdirectory where all public-facing PHP is,
+# the above RewriteRule ^(.*)$ public/index.php [L] will handle routing all non-files/non-dirs to public/index.php.
+# If you also want direct access to public/some_page.php to appear as /some_page,
+# you'd need rewrite rules within public/.htaccess itself.
+
+# Given your setup, the RewriteRule ^(.*)$ public/index.php [L] above is the most important one.
+# It means /products, /login, etc., all route to public/index.php, and then your PHP routing
+# handles which actual public/*.php file to include based on the URL.
+# If your routing is done by including files within index.php, you don't need the .php hide rule here.
+
+# If you want to directly access `public/some_file.php` as `baladymall.wuaze.com/public/some_file`
+# AND the .htaccess is in the `htdocs` root:
+# RewriteCond %{REQUEST_FILENAME}.php -f
+# RewriteRule ^(public/.*)$ $1.php [L]
+
+
+# ----------------------------------------------------------------------
+# | Security Enhancements                                              |
+# ----------------------------------------------------------------------
+
+# Deny access to sensitive files (e.g., .env, Composer files)
 <FilesMatch "\.(env|lock|yml|yaml|sql)$">
     Require all denied
 </FilesMatch>
@@ -22,7 +88,7 @@ DirectoryIndex index.php index.html
     Require all denied
 </FilesMatch>
 
-# Prevent PHP from executing on static file types (crucial for image 500 errors)
+# Prevent PHP execution in certain file types (e.g., if .php is accidentally in image folders)
 <FilesMatch "\.(js|css|gif|png|jpe?g|svg|ico|pdf|xml|json)$">
     SetHandler none
     <IfModule mod_php.c>
@@ -30,51 +96,10 @@ DirectoryIndex index.php index.html
     </IfModule>
 </FilesMatch>
 
-
 # ----------------------------------------------------------------------
-# | HTTPS Redirection (TEMPORARILY COMMENTED OUT FOR LOCAL DEV)        |
-# ----------------------------------------------------------------------
-
-# RewriteEngine On
-# RewriteCond %{HTTPS} off
-# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
-
-# ----------------------------------------------------------------------
-# | URL Rewriting (Hide .php Extension & Preserve AJAX POST)           |
+# | Performance Enhancements                                           |
 # ----------------------------------------------------------------------
 
-RewriteEngine On
-# Set the base URL for rewrite rules. THIS IS CRUCIAL FOR SUBDIRECTORIES.
-# Example: If your site is http://localhost/baladymall/, use /baladymall/
-# If your site is http://localhost/, use /
-RewriteBase /baladymall/
-
-# 1. ALWAYS serve real files and directories directly.
-#    This is the #1 rule to protect AJAX POSTs and static assets from rewriting.
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L] # If it's a real file or directory, stop rewrite processing.
-
-# 2. External Redirect: If accessing the project root (e.g., /baladymall/),
-#    redirect externally to /public/ for consistent main site entry.
-#    This rule will now use HTTP since HTTPS is commented out.
-RewriteRule ^$ public/ [L,R=301]
-
-# 3. Internal Rewrite for Hiding .php Extensions:
-#    This rule will rewrite requests like /public/products to /public/products.php
-#    AND /products (after the root rewrite) to /public/products.php
-#    It applies IF the request URI (without .php) corresponds to a real .php file.
-#    This is a standard pattern for clean URLs in subdirectories.
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule ^(.*)$ $1.php [L]
-
-
-# ----------------------------------------------------------------------
-# | Performance Enhancements (retained from previous versions)         |
-# ----------------------------------------------------------------------
-
-# Gzip Compression
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/plain
     AddOutputFilterByType DEFLATE text/html
@@ -88,7 +113,6 @@ RewriteRule ^(.*)$ $1.php [L]
     AddOutputFilterByType DEFLATE application/json
 </IfModule>
 
-# Browser Caching
 <IfModule mod_expires.c>
     ExpiresActive On
     ExpiresByType image/jpg "access 1 year"
@@ -103,20 +127,8 @@ RewriteRule ^(.*)$ $1.php [L]
     ExpiresDefault "access 2 days"
 </IfModule>
 
-
 # ----------------------------------------------------------------------
-# | Custom Error Pages (retained from previous versions)               |
-# ----------------------------------------------------------------------
-
-ErrorDocument 400 /public/error/400.php
-ErrorDocument 401 /public/error/401.php
-ErrorDocument 403 /public/error/403.php
-ErrorDocument 404 /public/error/404.php
-ErrorDocument 500 /public/error/500.php
-
-
-# ----------------------------------------------------------------------
-# | Security Headers (retained from previous versions)                 |
+# | Security Headers                                                   |
 # ----------------------------------------------------------------------
 
 Header always set X-Content-Type-Options "nosniff"
@@ -124,7 +136,7 @@ Header always set X-Frame-Options "DENY"
 Header always set X-XSS-Protection "1; mode=block"
 Header always set Referrer-Policy "no-referrer-when-downgrade"
 
-# Optional Advanced Headers
+# Optional advanced headers (uncomment and configure if needed)
 # Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:;"
 # Header always set Permissions-Policy "geolocation=(), microphone=()"
 # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

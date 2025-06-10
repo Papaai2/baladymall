@@ -525,3 +525,8 @@ a:hover {
 .top-products-section {
     flex: 1 1 300px;
 }
+
+/* For brand_admin/includes/display_admin_messages.php */
+.brand-admin-messages-container {
+    margin-bottom: 20px;
+}

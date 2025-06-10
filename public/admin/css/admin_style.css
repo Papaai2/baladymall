@@ -4,7 +4,7 @@ body, html {
     padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; /* Consistent font */
     background-color: #f0f2f5; /* Light grey background for admin area */
-    color: #343a40; 
+    color: #343a40;
     line-height: 1.6;
     font-size: 15px;
 }
@@ -31,23 +31,23 @@ a:hover {
     color: #ecf0f1; /* Light text */
     padding: 0 25px;
     border-bottom: 1px solid #34495e; /* Darker border */
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     position: sticky;
     top: 0;
     z-index: 1000;
 }
 
 .admin-header-inner {
-    max-width: 100%; /* Allow full width */
+    max-width: 100%;
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 65px; 
+    height: 65px;
 }
 
 .admin-logo a {
-    color: #ecf0f1; 
+    color: #ecf0f1;
     text-decoration: none;
     font-size: 1.4em; /* Slightly adjusted */
     font-weight: 600; /* Adjusted weight */
@@ -70,37 +70,37 @@ a:hover {
 }
 
 .admin-main-nav li {
-    margin-left: 18px; 
+    margin-left: 18px;
     font-size: 0.95em;
 }
 .admin-main-nav li:first-child { /* Welcome message */
-    color: #bdc3c7; 
+    color: #bdc3c7;
     font-weight: 500;
     padding-right: 10px;
 }
 
 
 .admin-main-nav a {
-    color: #bdc3c7; 
+    color: #bdc3c7;
     text-decoration: none;
-    padding: 10px 12px; 
+    padding: 10px 12px;
     border-radius: 5px;
     font-weight: 500;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .admin-main-nav a:hover,
-.admin-main-nav a.active { 
-    color: #ffffff; 
-    background-color: #34495e; 
+.admin-main-nav a.active {
+    color: #ffffff;
+    background-color: #34495e;
     text-decoration: none;
 }
 .admin-main-nav .logout-link {
-    color: #e74c3c; 
+    color: #e74c3c;
     font-weight: 500;
 }
 .admin-main-nav .logout-link:hover {
-    background-color: #c0392b; 
+    background-color: #c0392b;
     color: #fff;
 }
 
@@ -112,17 +112,17 @@ a:hover {
 }
 
 .admin-container {
-    background-color: #ffffff; 
+    background-color: #ffffff;
     padding: 20px 25px; /* Slightly reduced padding */
     border-radius: 8px; /* Slightly reduced radius */
     box-shadow: 0 3px 10px rgba(0,0,0,0.06); /* Adjusted shadow */
-    max-width: 100%; 
+    max-width: 100%;
 }
 
 .admin-footer {
     text-align: center;
     padding: 18px; /* Slightly reduced */
-    background-color: #e9ecef; 
+    background-color: #e9ecef;
     border-top: 1px solid #dee2e6;
     font-size: 0.88em; /* Slightly reduced */
     color: #6c757d;
@@ -131,10 +131,10 @@ a:hover {
 /* Page Title */
 .admin-page-title {
     font-size: 1.8em; /* Adjusted */
-    color: #343a40; 
+    color: #343a40;
     margin-bottom: 20px; /* Adjusted */
     padding-bottom: 12px; /* Adjusted */
-    border-bottom: 1px solid #e9ecef; 
+    border-bottom: 1px solid #e9ecef;
     font-weight: 600;
 }
 
@@ -159,16 +159,16 @@ a:hover {
     box-shadow: 0 5px 12px rgba(0,0,0,0.08); /* Adjusted */
 }
 
-.stat-card.total-sales { border-left-color: #28a745; } 
-.stat-card.total-orders { border-left-color: #007bff; } 
+.stat-card.total-sales { border-left-color: #28a745; }
+.stat-card.total-orders { border-left-color: #007bff; }
 .stat-card.average-order { border-left-color: #6f42c1; } /* Added purple for average order */
-.stat-card.total-users { border-left-color: #ffc107; } 
-.stat-card.pending-brands { border-left-color: #fd7e14; } 
+.stat-card.total-users { border-left-color: #ffc107; }
+.stat-card.pending-brands { border-left-color: #fd7e14; }
 
 .stat-card h3 {
     margin-top: 0;
     font-size: 0.95em; /* Adjusted */
-    color: #6c757d; 
+    color: #6c757d;
     margin-bottom: 6px; /* Adjusted */
     text-transform: uppercase;
     letter-spacing: 0.4px; /* Adjusted */
@@ -177,7 +177,7 @@ a:hover {
 
 .stat-card .stat-value {
     font-size: 2.2em; /* Adjusted */
-    font-weight: 700; 
+    font-weight: 700;
     color: #343a40;
     margin-bottom: 8px; /* Adjusted */
 }
@@ -204,8 +204,8 @@ a:hover {
     margin-top: 20px; /* Adjusted */
     font-size: 0.92em; /* Adjusted */
     box-shadow: 0 1px 6px rgba(0,0,0,0.05); /* Adjusted */
-    border-radius: 6px; 
-    overflow: hidden; 
+    border-radius: 6px;
+    overflow: hidden;
 }
 .admin-table th,
 .admin-table td {
@@ -222,20 +222,20 @@ a:hover {
 }
 
 .admin-table thead th {
-    background-color: #f8f9fa; 
-    font-weight: 600; 
+    background-color: #f8f9fa;
+    font-weight: 600;
     color: #495057;
     text-transform: uppercase;
     font-size: 0.8em; /* Adjusted */
     letter-spacing: 0.4px; /* Adjusted */
-    border-bottom-width: 2px; 
+    border-bottom-width: 2px;
     border-bottom-color: #dee2e6;
 }
 .admin-table tbody tr:nth-child(even) {
     background-color: #fcfcfc; /* Very light grey for even rows */
 }
 .admin-table tbody tr:hover {
-    background-color: #f1f3f7; 
+    background-color: #f1f3f7;
 }
 .admin-table .actions a, .admin-table .actions button {
     margin-right: 6px; /* Adjusted */
@@ -257,8 +257,8 @@ a:hover {
 .admin-table .actions .btn-approve,
 .admin-table .actions .btn-suspend,
 .admin-table .actions .btn-view,
-.admin-form .btn-submit, 
-.admin-filters button, 
+.admin-form .btn-submit,
+.admin-filters button,
 .admin-page-title + a.btn-submit,
 .admin-container > p > a.btn-submit /* For Add New buttons */
  {
@@ -274,7 +274,7 @@ a:hover {
     border-radius: 0.25rem;
     transition: color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
-.btn-edit:hover, .btn-approve:hover, .btn-suspend:hover, .btn-view:hover, .btn-submit:hover, 
+.btn-edit:hover, .btn-approve:hover, .btn-suspend:hover, .btn-view:hover, .btn-submit:hover,
 .admin-filters button:hover, .admin-page-title + a.btn-submit:hover,
 .admin-container > p > a.btn-submit:hover {
     transform: translateY(-1px);
@@ -297,7 +297,7 @@ a:hover {
 .btn-submit,
 .admin-form .btn-submit, /* Ensure specificity for form submit buttons */
 .admin-page-title + a.btn-submit,
-.admin-container > p > a.btn-submit { 
+.admin-container > p > a.btn-submit {
     background-color: #007bff; color: white; border-color: #007bff;
 }
 .btn-submit:hover,
@@ -317,9 +317,9 @@ a:hover {
 /* Status indicators in tables (Products, Orders, etc.) */
 .admin-table .status-active, .admin-table .status-delivered { color: #28a745; font-weight: 500; }
 .admin-table .status-inactive, .admin-table .status-cancelled, .admin-table .status-refunded { color: #dc3545; text-decoration: line-through;}
-.admin-table .status-pending-payment { color: #ffc107; font-weight: 500; } 
+.admin-table .status-pending-payment { color: #ffc107; font-weight: 500; }
 .admin-table .status-processing { color: #007bff; font-weight: 500; }
-.admin-table .status-shipped { color: #fd7e14; font-weight: 500; } 
+.admin-table .status-shipped { color: #fd7e14; font-weight: 500; }
 
 
 /* --- Form styling for admin --- */
@@ -342,7 +342,7 @@ a:hover {
     display: block;
     margin-bottom: 7px; /* Adjusted */
     font-weight: 500;
-    color: #495057; 
+    color: #495057;
 }
 .admin-form .form-group input[type="text"],
 .admin-form .form-group input[type="email"],
@@ -355,9 +355,9 @@ a:hover {
     width: 100%;
     padding: 9px 11px; /* Adjusted */
     border: 1px solid #ced4da;
-    border-radius: 5px; 
+    border-radius: 5px;
     font-size: 0.95em;
-    box-sizing: border-box; 
+    box-sizing: border-box;
     transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 .admin-form .form-group input:focus,
@@ -368,14 +368,14 @@ a:hover {
     box-shadow: 0 0 0 0.15rem rgba(0, 123, 255, 0.2); /* Adjusted shadow */
 }
 .admin-form .form-group textarea {
-    min-height: 100px; 
+    min-height: 100px;
 }
 .admin-form .form-group input[type="checkbox"] {
     margin-right: 8px;
     vertical-align: middle;
     width: auto; /* Override width 100% for checkbox */
 }
-.admin-form .form-group small { 
+.admin-form .form-group small {
     display: block;
     margin-top: 6px;
     font-size: 0.85em;
@@ -388,12 +388,12 @@ a:hover {
 
 /* --- Admin Messages (Success, Error, Info) --- */
 .admin-message {
-    padding: 12px 18px; 
-    margin-bottom: 20px; 
+    padding: 12px 18px;
+    margin-bottom: 20px;
     border-radius: 6px;
     font-size: 0.95em;
     border: 1px solid transparent;
-    display: flex; 
+    display: flex;
     align-items: center;
 }
 .admin-message.success {
@@ -403,10 +403,10 @@ a:hover {
     background-color: #f8d7da; color: #842029; border-color: #f5c2c7;
 }
 .admin-message.info {
-    background-color: #cff4fc; color: #055160; border-color: #b6effb; 
+    background-color: #cff4fc; color: #055160; border-color: #b6effb;
 }
 .admin-message.warning {
-    background-color: #fff3cd; color: #664d03; border-color: #ffecb5; 
+    background-color: #fff3cd; color: #664d03; border-color: #ffecb5;
 }
 
 
@@ -435,7 +435,7 @@ a:hover {
 }
 .admin-filters label {
     font-weight: 500;
-    margin-bottom: 0; 
+    margin-bottom: 0;
 }
 .admin-filters select, .admin-filters input[type="date"], .admin-filters input[type="text"] {
     padding: 8px 10px;
@@ -443,7 +443,7 @@ a:hover {
     border: 1px solid #ced4da;
     font-size: 0.9em;
 }
-.admin-filters button { 
+.admin-filters button {
     padding: 8px 12px; /* Uses .btn-submit styles now */
 }
 
@@ -569,3 +569,8 @@ a:hover {
 .order-totals p { margin-bottom: 8px; }
 .order-totals hr { margin: 10px 0; border-color: #eee; }
 
+
+/* For admin/includes/display_admin_messages.php */
+.admin-messages-container {
+    margin-bottom: 20px;
+}

@@ -8,9 +8,6 @@
 // 2. Defined necessary constants like SITE_URL.
 
 // No need to session_start() or define SESSION_NAME here, as config.php handles it.
-// If config.php is *not* guaranteed to be included before this,
-// then the session_start() logic here would be necessary, but it would
-// indicate a less optimal file inclusion strategy.
 // Given your other files, config.php is indeed included first.
 
 // Check if user is logged in

@@ -1,6 +1,8 @@
 /**
  * BaladyMall - Main JavaScript File
  * public/js/script.js
+ *
+ * REVISION: All animated text functionality removed.
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -45,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
         backToTopButton.style.display = 'none';
         backToTopButton.style.padding = '10px 15px';
         backToTopButton.style.fontSize = '18px';
-        backToTopButton.style.backgroundColor = '#007bff';
+        backToTopButton.style.backgroundColor = '#007bff'; // This color is temporary, should use CSS var
         backToTopButton.style.color = 'white';
         backToTopButton.style.border = 'none';
         backToTopButton.style.borderRadius = '5px';
@@ -68,23 +70,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- Hero Section Text Typing Animation ---
-    const heroTitle = document.querySelector('.hero-content h1');
-    if (heroTitle && heroTitle.dataset.typingText) {
-        const originalText = heroTitle.dataset.typingText;
-        let i = 0;
-        heroTitle.textContent = '';
-        function typeWriter() {
-            if (i < originalText.length) {
-                heroTitle.textContent += originalText.charAt(i);
-                i++;
-                setTimeout(typeWriter, 100);
-            }
-        }
-        setTimeout(typeWriter, 500);
-    } else if (heroTitle) {
-        // console.log("Hero title found, but no 'data-typing-text' attribute for animation.");
-    }
+    // --- REMOVED: Hero Section Text Typing Animation ---
+    // The code for the animated text has been removed from this file.
+
 
     // --- Scroll-triggered Animations (Fade-in) ---
     const animatedElements = document.querySelectorAll('.animate-on-scroll');
@@ -120,130 +108,165 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // --- Custom Alert/Message Box Handling ---
-    function showCustomMessage(message, type = 'info', duration = 4000) {
-        const messageContainerId = 'custom-message-box-container';
-        let messageContainer = document.getElementById(messageContainerId);
+    // --- Custom Alert/Message Box Handling (Improved version) ---
+    window.showCustomMessage = function(message, type = 'info', duration = 4000) {
+        const existingBox = document.querySelector('.custom-message-box');
+        if(existingBox) existingBox.remove();
+        
+        const messageBox = document.createElement('div');
+        messageBox.className = `custom-message-box custom-message-${type}`;
+        messageBox.setAttribute('role', 'alert');
+        messageBox.innerHTML = `<span>${message}</span><button class="close-custom-message" aria-label="Close message">&times;</button>`;
+        document.body.appendChild(messageBox);
+        
+        requestAnimationFrame(() => {
+            messageBox.classList.add('visible');
+        });
 
-        if (!messageContainer) {
-            messageContainer = document.createElement('div');
-            messageContainer.id = messageContainerId;
-            document.body.appendChild(messageContainer);
-        }
-
-        messageContainer.className = 'custom-message-box';
-        messageContainer.classList.add(`custom-message-${type}`);
-
-        messageContainer.innerHTML = `<span>${message}</span><button class="close-custom-message" aria-label="Close message">&times;</button>`;
-        messageContainer.style.display = 'block';
-
-        setTimeout(() => {
-            messageContainer.classList.add('visible');
-        }, 10);
-
-        const closeButton = messageContainer.querySelector('.close-custom-message');
-        const hideMessage = () => {
-            messageContainer.classList.remove('visible');
-            setTimeout(() => {
-                if (messageContainer) messageContainer.style.display = 'none';
-            }, 300);
+        const closeMessage = () => {
+            messageBox.classList.remove('visible');
+            messageBox.addEventListener('transitionend', () => messageBox.remove(), { once: true });
         };
 
-        if(closeButton) {
-            closeButton.onclick = hideMessage;
+        const closeButton = messageBox.querySelector('.close-custom-message');
+        if (closeButton) {
+            closeButton.addEventListener('click', closeMessage);
         }
-
+        
         if (duration > 0) {
-            setTimeout(hideMessage, duration);
+            setTimeout(closeMessage, duration);
         }
-    }
-    window.showCustomMessage = showCustomMessage; // Make it globally accessible
+    };
 
-    const phpSuccessMsg = document.getElementById('phpGlobalSuccessMessage');
-    if (phpSuccessMsg && phpSuccessMsg.textContent.trim() !== '') {
-        showCustomMessage(phpSuccessMsg.textContent.trim(), 'success');
-        phpSuccessMsg.style.display = 'none';
+    // Display any PHP-generated global messages that might be present on initial page load
+    const phpGlobalMessage = document.getElementById('phpGlobalSuccessMessage');
+    if (phpGlobalMessage) {
+        window.showCustomMessage(phpGlobalMessage.textContent.trim(), 'success');
+        phpGlobalMessage.remove();
     }
-    const phpErrorMsg = document.getElementById('phpGlobalErrorMessage');
-    if (phpErrorMsg && phpErrorMsg.textContent.trim() !== '') {
-        showCustomMessage(phpErrorMsg.textContent.trim(), 'error');
-        phpErrorMsg.style.display = 'none';
+    const phpGlobalErrorMessage = document.getElementById('phpGlobalErrorMessage');
+    if (phpGlobalErrorMessage) {
+        window.showCustomMessage(phpGlobalErrorMessage.textContent.trim(), 'error');
+        phpGlobalErrorMessage.remove();
     }
+
 
     // --- Mobile Menu Toggle ---
-    const mobileMenuButton = document.getElementById('mobileMenuToggle');
-    const mainNavUl = document.querySelector('.main-navigation ul');
+    const mobileMenuButton = document.getElementById('mobile-menu-toggle'); // **FIXED LINE**
+    const mainNav = document.querySelector('.main-navigation');
 
-    if (mobileMenuButton && mainNavUl) {
+    if (mobileMenuButton && mainNav) {
         mobileMenuButton.addEventListener('click', function() {
-            mainNavUl.classList.toggle('active');
+            mainNav.classList.toggle('active');
             mobileMenuButton.classList.toggle('is-active');
-            const isExpanded = mainNavUl.classList.contains('active');
+            const isExpanded = mainNav.classList.contains('active');
             mobileMenuButton.setAttribute('aria-expanded', isExpanded.toString());
+        });
+
+        // Close menu when clicking outside of it
+        document.addEventListener('click', function(event) {
+            // Check if the click was outside the nav and the toggle button
+            if (!mainNav.contains(event.target) && !mobileMenuButton.contains(event.target) && mainNav.classList.contains('active')) {
+                mainNav.classList.remove('active');
+                mobileMenuButton.classList.remove('is-active');
+                mobileMenuButton.setAttribute('aria-expanded', 'false');
+            }
+        });
+        // Optional: Close menu when a navigation link is clicked (common mobile menu behavior)
+        mainNav.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', function() {
+                mainNav.classList.remove('active');
+                mobileMenuButton.classList.remove('is-active');
+                mobileMenuButton.setAttribute('aria-expanded', 'false');
+            });
         });
     }
 
-    // --- AJAX Add to Cart Functionality (REVISED FIX) ---
+
+    // --- AJAX Add to Cart Functionality ---
     const ajaxAddToCartForms = document.querySelectorAll('.ajax-add-to-cart-form');
     const cartCountSpan = document.querySelector('.header-actions .cart-count');
 
     ajaxAddToCartForms.forEach(form => {
         form.addEventListener('submit', function(e) {
-            e.preventDefault(); // Prevent default form submission (redirection)
+            e.preventDefault(); // Prevent default form submission
 
             const formData = new FormData(this); // Get form data
-            const formAction = this.getAttribute('action'); // Correctly get the string value of the action attribute
-
-            // Disable button to prevent multiple clicks
-            const submitButton = this.querySelector('button[type="submit"]');
-            const originalButtonText = submitButton ? submitButton.textContent : 'Add to Cart'; // Store original text
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.textContent = 'Adding...'; // Optional: change button text
+            const formActionUrl = this.getAttribute('action'); 
+            
+            if (typeof formActionUrl !== 'string' || !formActionUrl) {
+                console.error("AJAX Add to Cart: Form action URL is invalid or empty. Aborting fetch.");
+                window.showCustomMessage("Configuration error: Cart action URL is missing.", 'error');
+                return;
             }
 
-            fetch(formAction, {
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalButtonContent = submitButton ? submitButton.innerHTML : 'Add to Cart';
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = 'Adding...';
+            }
+
+            const currentMessages = document.querySelectorAll('.custom-message-box');
+            currentMessages.forEach(msg => msg.remove());
+
+            fetch(formActionUrl, { // Send AJAX request to form's action URL
                 method: 'POST',
                 body: formData,
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest' // Identify as AJAX request
+                    'X-Requested-With': 'XMLHttpRequest', // Identify as AJAX request
+                    'Accept': 'application/json'
                 }
             })
             .then(response => {
-                if (!response.ok) { // Check if HTTP status is 2xx
-                    // If response is not OK, try to read text for more info before throwing
+                if (!response.ok) {
                     return response.text().then(text => {
+                        console.error('Server responded with non-OK status:', response.status, text);
                         throw new Error(`HTTP error! status: ${response.status}, Response: ${text}`);
                     });
                 }
-                return response.json(); // Parse JSON response
+                return response.json();
             })
             .then(data => {
-                // Re-enable button
-                if (submitButton) {
-                    submitButton.disabled = false;
-                    submitButton.textContent = originalButtonText; // Revert to original text
+                if (typeof data !== 'object' || data === null || !('success' in data)) {
+                    throw new TypeError('Invalid JSON response format from server.');
                 }
 
                 if (data.success) {
-                    window.showCustomMessage(data.message, data.type || 'success'); // Use data.type if provided
+                    window.showCustomMessage(data.message || 'Item added to cart!', data.type || 'success');
+                    
                     if (cartCountSpan && data.cart_item_count !== undefined) {
-                        cartCountSpan.textContent = data.cart_item_count; // Update cart count in header
+                        cartCountSpan.textContent = data.cart_item_count;
                     }
+                    
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
+
                 } else {
-                    window.showCustomMessage(data.message || 'Failed to add to cart. No specific error provided.', data.type || 'error');
+                    window.showCustomMessage(data.message || 'Failed to add item to cart.', data.type || 'error');
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
                 }
             })
             .catch(error => {
-                console.error('AJAX add to cart error:', error);
-                // The error message now already contains the raw response text if not 2xx
-                window.showCustomMessage('An unexpected network or server error occurred. Please try again. Check console for details.', 'error');
+                console.error('AJAX Add to Cart Request Error:', error);
+                let errorMessage = 'An unexpected error occurred. Please try again.';
+                if (error instanceof TypeError && error.message.includes('Invalid JSON response')) {
+                    errorMessage = 'Server response error: Could not process data.';
+                } else if (error.message.includes('HTTP error!')) {
+                    errorMessage = `Server error: ${error.message.split(',')[0]}`;
+                }
+                window.showCustomMessage(errorMessage, 'error');
+            })
+            .finally(() => {
                 if (submitButton) {
                     submitButton.disabled = false;
-                    submitButton.textContent = originalButtonText;
+                    submitButton.innerHTML = originalButtonContent;
                 }
             });
         });
     });
 
-}); // End DOMContentLoaded
+}); // End of DOMContentLoaded

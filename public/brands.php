@@ -59,7 +59,7 @@ if ($db_available) {
 
 ?>
 
-<section class="brand-listing-section" style="padding: 30px 0;">
+<section class="brand-listing-section">
     <div class="container">
         <h2 class="section-title text-center mb-4">Discover Our Brands</h2>
 
@@ -74,8 +74,7 @@ if ($db_available) {
                 No brands found at the moment. Please check back soon!
             </p>
         <?php elseif (!empty($brands_list)): ?>
-            <div class="product-grid">
-                <?php foreach ($brands_list as $brand): ?>
+            <div class="product-grid"> <?php foreach ($brands_list as $brand): ?>
                     <?php
                         // Use get_asset_url for the brand specific product listing
                         $brand_url = get_asset_url("products.php?brand_id=" . esc_html($brand['brand_id']));
@@ -84,46 +83,38 @@ if ($db_available) {
                         $logo_display_url = '';
 
                         // Determine fallback logo URL and ensure it's properly escaped for the onerror attribute
-                        $fallback_logo_url_esc = '';
+                        $fallback_logo_url_esc = get_asset_url('images/no-image.png'); // Fallback to a local 'no-image' if placeholder generator is not defined or empty
                         if (defined('PLACEHOLDER_IMAGE_URL_GENERATOR') && !empty(PLACEHOLDER_IMAGE_URL_GENERATOR)) {
                             $fallback_logo_url_esc = esc_html(rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/CCC/777?text=Logo+Error");
-                        } else {
-                            // Fallback to a local 'no-image' if placeholder generator is not defined or empty
-                            $fallback_logo_url_esc = get_asset_url('images/no-image.png'); // Assuming you have this file
                         }
 
-                        // Fix: If DB stores 'brands/filename.jpg', ensure get_asset_url gets 'uploads/brands/filename.jpg'
+                        // FIX: If DB stores 'brands/filename.jpg', ensure get_asset_url gets 'uploads/brands/filename.jpg'
                         if (!empty($logo_path)) {
                             if (filter_var($logo_path, FILTER_VALIDATE_URL)) {
                                 $logo_display_url = $logo_path;
                             } else {
-                                // Prepends PUBLIC_ROOT_PATH equivalent. Assumes $logo_path starts with 'brands/' or similar.
                                 $logo_display_url = get_asset_url('uploads/' . ltrim($logo_path, '/'));
                             }
                         }
 
                         // If main $logo_display_url is still empty, set it to the fallback
                         if (empty($logo_display_url)) {
-                            $logo_display_url = $fallback_logo_url_esc;
+                            $logo_display_url = defined('PLACEHOLDER_IMAGE_URL_GENERATOR') ? rtrim(PLACEHOLDER_IMAGE_URL_GENERATOR, '/') . "/300x200/F0F0F0/AAA?text=Brand+Logo" : $fallback_logo_url_esc;
                         }
                     ?>
-                    <div class="product-item animate-on-scroll">
-                        <a href="<?php echo $brand_url; ?>">
-                            <img src="<?php echo $logo_display_url; ?>"
-                                 alt="<?php echo esc_html($brand['brand_name']); ?> Logo"
-                                 onerror="this.onerror=null;this.src='<?php echo $fallback_logo_url_esc; ?>';"
-                                 class="rounded-md shadow-sm">
-                            <h3 class="product-name"><?php echo esc_html($brand['brand_name']); ?></h3>
-                        </a>
-                        <div class="item-content-wrapper">
-                            <p class="product-brand" style="font-style: italic; font-size: 0.9em; min-height: 2.7em; /* Approx 2 lines */ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                <?php echo !empty($brand['brand_description']) ? esc_html(substr($brand['brand_description'], 0, 70)) . (strlen($brand['brand_description']) > 70 ? '...' : '') : 'Discover products from this amazing brand.'; ?>
-                            </p>
-                            <p class="product-count-info" style="font-size: 0.85em; color: #6c757d; margin-top: 5px;">
-                                <?php echo esc_html($brand['product_count']); ?> Product(s)
-                            </p>
+                    <div class="product-item animate-on-scroll"> <a href="<?php echo $brand_url; ?>" class="product-item-link"> <div class="product-image-container"> <img src="<?php echo $logo_display_url; ?>"
+                                     alt="<?php echo esc_html($brand['brand_name']); ?> Logo"
+                                     onerror="this.onerror=null;this.src='<?php echo $fallback_logo_url_esc; ?>';"
+                                     class="product-image"> </div>
+                            <div class="item-content-wrapper"> <h3 class="product-name"><?php echo esc_html($brand['brand_name']); ?></h3> <p class="product-brand" style="font-style: italic; font-size: 0.9em; min-height: 2.7em; /* Approx 2 lines */ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    <?php echo !empty($brand['brand_description']) ? esc_html(substr($brand['brand_description'], 0, 70)) . (strlen($brand['brand_description']) > 70 ? '...' : '') : 'Discover products from this amazing brand.'; ?>
+                                </p>
+                                <p class="product-count-info" style="font-size: 0.85em; color: #6c757d; margin-top: 5px;">
+                                    <?php echo esc_html($brand['product_count']); ?> Product(s)
+                                </p>
+                            </div>
+                        </a> <div class="product-actions mt-auto"> <a href="<?php echo $brand_url; ?>" class="btn btn-sm btn-outline-primary">View Products</a>
                         </div>
-                        <a href="<?php echo $brand_url; ?>" class="btn btn-sm btn-outline-primary mt-auto">View Products</a>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -132,10 +123,10 @@ if ($db_available) {
 </section>
 
 <?php
-$footer_path_from_public = PROJECT_ROOT_PATH . '/src/includes/footer.php';
-if (file_exists($footer_path_from_public)) {
-    require_once $footer_path_from_public;
+$footer_path = PROJECT_ROOT_PATH . '/src/includes/footer.php';
+if (file_exists($footer_path)) {
+    require_once $footer_path;
 } else {
-    die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path_from_public));
+    die("Critical error: Footer file not found. Expected at: " . htmlspecialchars($footer_path));
 }
 ?>
